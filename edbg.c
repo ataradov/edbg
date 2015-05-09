@@ -212,7 +212,7 @@ void save_file(char *name, uint8_t *data, int size)
 //-----------------------------------------------------------------------------
 static void print_help(char *name)
 {
-  printf("Atmel EDBG programmer v0.9, built " __DATE__ " " __TIME__ " \n");
+  printf("Atmel EDBG programmer v0.10, built " __DATE__ " " __TIME__ " \n");
   printf("Usage: %s [options]\n", name);
   printf("Options:\n");
   printf("  -h, --help                 print this help message and exit\n");
