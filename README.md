@@ -9,7 +9,7 @@ Simply run 'make all' and you will get a small binary. The dependencies are mini
 it will be obvious if you are missing something.
 
 ## Usage
-
+```
 Usage: edbg [options]
 Options:
   -h, --help                 print this help message and exit
@@ -22,4 +22,4 @@ Options:
   -l, --list                 list all available debuggers
   -s, --serial <number>      use a debugger with a specified serial number
   -b, --verbose              print verbose messages
-
+```
