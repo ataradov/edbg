@@ -42,6 +42,7 @@ typedef struct
 {
   char     *path;
   char     *serial;
+  wchar_t  *wserial;
   char     *manufacturer;
   char     *product;
 } debugger_t;
