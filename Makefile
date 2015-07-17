@@ -35,7 +35,6 @@ else
 endif
 
 CFLAGS += -W -Wall -O2 -std=gnu99
-CFLAGS += -Wno-unused-parameter -Wno-sign-compare
 
 all: $(BIN)
 	
