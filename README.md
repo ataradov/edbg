@@ -1,7 +1,7 @@
 # Atmel EDBG prgammer
 
 This is a simple command line utility for programming Atmel MCUs though EDBG interface.
-It eorks on Linux and Windows.
+It works on Linux, MAC and Windows.
 
 ## Installation
 
