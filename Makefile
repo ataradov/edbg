@@ -25,6 +25,8 @@ else
     LIBS += hidapi/mac/.libs/libhidapi.a
     LIBS += -framework IOKit
     LIBS += -framework CoreFoundation
+    HIDAPI = hidapi/mac/.libs/libhidapi.a
+    CFLAGS += -Ihidapi/hidapi
   else
     BIN = edbg.exe
     SRCS += dbg_win.c
@@ -34,9 +36,10 @@ endif
 
 CFLAGS += -W -Wall -O2 -std=gnu99
 CFLAGS += -Wno-unused-parameter -Wno-sign-compare
-CFLAGS += -Ihidapi/hidapi
 
-all: $(SRCS) $(HDRS) hidapi/mac/.libs/libhidapi.a
+all: $(BIN)
+	
+$(BIN): $(SRCS) $(HDRS) $(HIDAPI)
 	gcc $(CFLAGS) $(SRCS) $(LIBS) -o $(BIN)
 
 hidapi/mac/.libs/libhidapi.a:
