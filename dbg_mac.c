@@ -48,10 +48,12 @@ static uint8_t hid_buffer[HID_BUFFER_SIZE];
 
 /*- Implementations ---------------------------------------------------------*/
 
-char * wcstombsdup(const wchar_t * const src) {
+char * wcstombsdup(const wchar_t * const src)
+{
   const int len = wcslen(src);
   char * const dst = malloc(len+1);
-  if(dst) {
+  if(dst)
+  {
     wcstombs(dst, src, len);
     dst[len] = '\0';
   }
@@ -59,7 +61,8 @@ char * wcstombsdup(const wchar_t * const src) {
 }
 
 //-----------------------------------------------------------------------------
-int dbg_enumerate(debugger_t *debuggers, int size) {
+int dbg_enumerate(debugger_t *debuggers, int size) 
+{
   int rsize = 0;
 
   struct hid_device_info *devs, *cur_dev;
@@ -69,8 +72,10 @@ int dbg_enumerate(debugger_t *debuggers, int size) {
 
   devs = hid_enumerate(0x0, 0x0);
   cur_dev = devs;	
-  for(cur_dev = devs; cur_dev && rsize < size; cur_dev = cur_dev->next) {
-    if(DBG_VID == cur_dev->vendor_id && DBG_PID == cur_dev->product_id) {
+  for(cur_dev = devs; cur_dev && rsize < size; cur_dev = cur_dev->next)
+  {
+    if(DBG_VID == cur_dev->vendor_id && DBG_PID == cur_dev->product_id)
+    {
       debuggers[rsize].path = strdup(cur_dev->path);
       debuggers[rsize].serial = cur_dev->serial_number ? wcstombsdup(cur_dev->serial_number) : "<unknown>";
       debuggers[rsize].wserial = cur_dev->serial_number ? wcsdup(cur_dev->serial_number) : NULL;
@@ -86,20 +91,23 @@ int dbg_enumerate(debugger_t *debuggers, int size) {
 }
 
 //-----------------------------------------------------------------------------
-void dbg_open(debugger_t *debugger) {
+void dbg_open(debugger_t *debugger)
+{
   handle = hid_open(DBG_VID, DBG_PID, debugger->wserial);
   if (!handle)
     perror_exit("unable to open device");
 }
 
 //-----------------------------------------------------------------------------
-void dbg_close(void) {
+void dbg_close(void)
+{
   if (handle)
     hid_close(handle);
 }
 
 //-----------------------------------------------------------------------------
-int dbg_dap_cmd(uint8_t *data, int size, int rsize) {
+int dbg_dap_cmd(uint8_t *data, int size, int rsize)
+{
   char cmd = data[0];
   int res;
 
@@ -109,7 +117,8 @@ int dbg_dap_cmd(uint8_t *data, int size, int rsize) {
   memcpy(&hid_buffer[1], data, rsize);
 
   res = hid_write(handle, hid_buffer, HID_BUFFER_SIZE/*rsize+1*/); // Atmel EDBG expects 512 bytes
-  if (res < 0) {
+  if (res < 0)
+  {
     printf("Error: %ls\n", hid_error(handle));
     perror_exit("debugger write()");
   }
