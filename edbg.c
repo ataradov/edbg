@@ -212,7 +212,7 @@ void save_file(char *name, uint8_t *data, int size)
 //-----------------------------------------------------------------------------
 static void print_help(char *name)
 {
-  printf("Atmel EDBG programmer v0.10, built " __DATE__ " " __TIME__ " \n");
+  printf("Atmel EDBG programmer v0.12, built " __DATE__ " " __TIME__ " \n");
   printf("Usage: %s [options]\n", name);
   printf("Options:\n");
   printf("  -h, --help                 print this help message and exit\n");
@@ -300,6 +300,7 @@ int main(int argc, char **argv)
 
   dbg_open(&debuggers[debugger]);
 
+  dap_disconnect();
   dap_get_debugger_info();
   dap_connect();
   dap_transfer_configure(0, 4096, 0);
@@ -328,6 +329,8 @@ int main(int argc, char **argv)
 
   if (g_read)
     target->ops->read(g_file);
+
+  target->ops->deselect();
 
   dap_reset_target_hw();
   dap_disconnect();

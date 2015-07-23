@@ -126,6 +126,13 @@ static void target_cm7_select(void)
 }
 
 //-----------------------------------------------------------------------------
+static void target_cm7_deselect(void)
+{
+  dap_write_word(DEMCR, 0x00000000);
+  dap_write_word(DHCSR, 0xa05f0000);
+}
+
+//-----------------------------------------------------------------------------
 static void target_cm7_erase(void)
 {
   verbose("Erasing... ");
@@ -275,11 +282,12 @@ static void target_cm7_read(char *name)
 //-----------------------------------------------------------------------------
 target_ops_t target_cm7_ops = 
 {
-  .select  = target_cm7_select,
-  .erase   = target_cm7_erase,
-  .lock    = target_cm7_lock,
-  .program = target_cm7_program,
-  .verify  = target_cm7_verify,
-  .read    = target_cm7_read,
+  .select   = target_cm7_select,
+  .deselect = target_cm7_deselect,
+  .erase    = target_cm7_erase,
+  .lock     = target_cm7_lock,
+  .program  = target_cm7_program,
+  .verify   = target_cm7_verify,
+  .read     = target_cm7_read,
 };
 

@@ -37,6 +37,7 @@
 typedef struct
 {
   void (*select)(void);
+  void (*deselect)(void);
   void (*erase)(void);
   void (*lock)(void);
   void (*program)(char *name);

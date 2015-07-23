@@ -59,11 +59,11 @@ typedef struct
 /*- Variables ---------------------------------------------------------------*/
 static device_t devices[] =
 {
-  { 0x10001100, "SAM D20J18A",	0,	256*1024,	64,	4096,	256 }, 
-  { 0x10010100, "SAM D21J18A",	0,	256*1024,	64,	4096,	256 },
-  { 0x10010200, "SAM D21J18A (C)", 0,	256*1024,	64,	4096,	256 },
-  { 0x10010019, "SAM R21G18 ES", 0,	256*1024,	64,	4096,	256 },
-  { 0x10010119, "SAM R21G18",	0,	256*1024,	64,	4096,	256 },
+  { 0x10001100, "SAM D20J18A",		0,	256*1024,	64,	4096,	256 }, 
+  { 0x10010100, "SAM D21J18A",		0,	256*1024,	64,	4096,	256 },
+  { 0x10010200, "SAM D21J18A Rev C",	0,	256*1024,	64,	4096,	256 },
+  { 0x10010019, "SAM R21G18 ES",	0,	256*1024,	64,	4096,	256 },
+  { 0x10010119, "SAM R21G18",		0,	256*1024,	64,	4096,	256 },
   { 0, "", 0, 0, 0, 0, 0 },
 };
 
@@ -93,6 +93,13 @@ static void target_cm0p_select(void)
   }
 
   error_exit("unknown target device (DSU_DID = 0x%08x)", dsu_did);
+}
+
+//-----------------------------------------------------------------------------
+static void target_cm0p_deselect(void)
+{
+  dap_write_word(DEMCR, 0x00000000);
+  dap_write_word(DHCSR, 0xa05f0000);
 }
 
 //-----------------------------------------------------------------------------
@@ -248,11 +255,12 @@ static void target_cm0p_read(char *name)
 //-----------------------------------------------------------------------------
 target_ops_t target_cm0p_ops = 
 {
-  .select  = target_cm0p_select,
-  .erase   = target_cm0p_erase,
-  .lock    = target_cm0p_lock,
-  .program = target_cm0p_program,
-  .verify  = target_cm0p_verify,
-  .read    = target_cm0p_read,
+  .select   = target_cm0p_select,
+  .deselect = target_cm0p_deselect,
+  .erase    = target_cm0p_erase,
+  .lock     = target_cm0p_lock,
+  .program  = target_cm0p_program,
+  .verify   = target_cm0p_verify,
+  .read     = target_cm0p_read,
 };
 

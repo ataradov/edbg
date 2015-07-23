@@ -286,7 +286,7 @@ void dap_reset_target_hw(void)
   //-------------
   buf[0] = ID_DAP_SWJ_PINS;
   buf[1] = 0; // Value
-  buf[2] = DAP_SWJ_nRESET; // Select
+  buf[2] = DAP_SWJ_nRESET | DAP_SWJ_SWCLK_TCK | DAP_SWJ_SWDIO_TMS; // Select
   buf[3] = 0; // Wait
   buf[4] = 0;
   buf[5] = 0;
@@ -296,7 +296,7 @@ void dap_reset_target_hw(void)
   //-------------
   buf[0] = ID_DAP_SWJ_PINS;
   buf[1] = DAP_SWJ_nRESET; // Value
-  buf[2] = DAP_SWJ_nRESET; // Select
+  buf[2] = DAP_SWJ_nRESET | DAP_SWJ_SWCLK_TCK | DAP_SWJ_SWDIO_TMS; // Select
   buf[3] = 0; // Wait
   buf[4] = 0;
   buf[5] = 0;
