@@ -279,8 +279,6 @@ int main(int argc, char **argv)
 
   if (0 == n_debuggers)
     error_exit("no debuggers found");
-  else if (n_debuggers > 1 && !g_all && !g_serial)
-    error_exit("more than one debugger found, please specify a serial number or select all");
 
   if (g_list)
   {
@@ -289,6 +287,9 @@ int main(int argc, char **argv)
       printf("  %s - %s %s\n", debuggers[i].serial, debuggers[i].manufacturer, debuggers[i].product);
     return 0;
   }
+
+  if (n_debuggers > 1 && !g_all && !g_serial)
+    error_exit("more than one debugger found, please specify a serial number or select all");
 
   if (g_serial)
   {
@@ -343,6 +344,8 @@ int main(int argc, char **argv)
     dap_led(0, 0);
 
     dbg_close();
+
+    if(!g_all) break;
   }
 
   return 0;
