@@ -64,12 +64,13 @@ static const struct option long_options[] =
   { "read",      no_argument,        0, 'r' },
   { "file",      required_argument,  0, 'f' },
   { "list",      no_argument,        0, 'l' },
+  { "all",       no_argument,        0, 'a' },
   { "serial",    required_argument,  0, 's' },
   { "verbose",   no_argument,        0, 'b' },
   { 0, 0, 0, 0 }
 };
 
-static const char *short_options = "hepvkrf:ls:b";
+static const char *short_options = "hepvkrf:las:b";
 
 static bool g_erase = false;
 static bool g_program = false;
@@ -79,6 +80,7 @@ static bool g_read = false;
 static char *g_file = NULL;
 static char *g_serial = NULL;
 static bool g_list = false;
+static bool g_all = false;
 static bool g_verbose = false;
 
 /*- Implementations ---------------------------------------------------------*/
@@ -223,6 +225,7 @@ static void print_help(char *name)
   printf("  -r, --read                 read the contents of the chip\n");
   printf("  -f, --file <file>          binary file to be programmed or verified\n");
   printf("  -l, --list                 list all available debuggers\n");
+  printf("  -a, --all                  execute the commands against all found debuggers\n");
   printf("  -s, --serial <number>      use a debugger with a specified serial number\n");
   printf("  -b, --verbose              print verbose messages\n");
   exit(0);
@@ -246,6 +249,7 @@ static void parse_command_line(int argc, char **argv)
       case 'r': g_read = true; break;
       case 'f': g_file = optarg; break;
       case 'l': g_list = true; break;
+      case 'a': g_all = true; break;
       case 's': g_serial = optarg; break;
       case 'b': g_verbose = true; break;
       default: exit(1); break;
@@ -260,7 +264,7 @@ int main(int argc, char **argv)
 {
   debugger_t debuggers[MAX_DEBUGGERS];
   int n_debuggers = 0;
-  int debugger = -1;
+  int debugger = 0;
   target_t *target;
 
   parse_command_line(argc, argv);
@@ -273,6 +277,9 @@ int main(int argc, char **argv)
 
   n_debuggers = dbg_enumerate(debuggers, MAX_DEBUGGERS);
 
+  if (0 == n_debuggers)
+    error_exit("no debuggers found");
+
   if (g_list)
   {
     printf("Attached debuggers:\n");
@@ -281,8 +288,13 @@ int main(int argc, char **argv)
     return 0;
   }
 
+  if (n_debuggers > 1 && !g_all && !g_serial)
+    error_exit("more than one debugger found, please specify a serial number or select all");
+
   if (g_serial)
   {
+    debugger = -1;
+
     for (int i = 0; i < n_debuggers; i++)
       if (0 == strcmp(debuggers[i].serial, g_serial))
         debugger = i;
@@ -291,52 +303,50 @@ int main(int argc, char **argv)
       error_exit("unable to find a debugger with specified serial number");
   }
 
-  if (0 == n_debuggers)
-    error_exit("no debuggers found");
-  else if (1 == n_debuggers)
-    debugger = 0;
-  else if (n_debuggers > 1 && -1 == debugger)
-    error_exit("more than one debugger found, please specify a serial number");
+  for(; debugger < n_debuggers; debugger++)
+  {
+    dbg_open(&debuggers[debugger]);
 
-  dbg_open(&debuggers[debugger]);
+    dap_disconnect();
+    dap_get_debugger_info();
+    dap_connect();
+    dap_transfer_configure(0, 4096, 0);
+    dap_swd_configure(0);
+    dap_led(0, 1);
+    dap_reset_target();
+    dap_reset_link();
+    dap_swj_clock(DAP_FREQ);
 
-  dap_disconnect();
-  dap_get_debugger_info();
-  dap_connect();
-  dap_transfer_configure(0, 4096, 0);
-  dap_swd_configure(0);
-  dap_led(0, 1);
-  dap_reset_target();
-  dap_reset_link();
-  dap_swj_clock(DAP_FREQ);
+    target = target_identify();
+    dap_target_prepare();
 
-  target = target_identify();
-  dap_target_prepare();
+    target->ops->select();
 
-  target->ops->select();
+    if (g_erase)
+      target->ops->erase();
 
-  if (g_erase)
-    target->ops->erase();
+    if (g_program)
+      target->ops->program(g_file);
 
-  if (g_program)
-    target->ops->program(g_file);
+    if (g_verify)
+      target->ops->verify(g_file);
 
-  if (g_verify)
-    target->ops->verify(g_file);
+    if (g_lock)
+      target->ops->lock();
 
-  if (g_lock)
-    target->ops->lock();
+    if (g_read)
+      target->ops->read(g_file);
 
-  if (g_read)
-    target->ops->read(g_file);
+    target->ops->deselect();
 
-  target->ops->deselect();
+    dap_reset_target_hw();
+    dap_disconnect();
+    dap_led(0, 0);
 
-  dap_reset_target_hw();
-  dap_disconnect();
-  dap_led(0, 0);
+    dbg_close();
 
-  dbg_close();
+    if(!g_all) break;
+  }
 
   return 0;
 }

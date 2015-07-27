@@ -28,6 +28,7 @@ Options:
   -r, --read                 read the contents of the chip
   -f, --file <file>          binary file to be programmed or verified
   -l, --list                 list all available debuggers
+  -a, --all                  execute the commands against all found debuggers
   -s, --serial <number>      use a debugger with a specified serial number
   -b, --verbose              print verbose messages
 ```
