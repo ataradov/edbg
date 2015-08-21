@@ -440,6 +440,12 @@ uint32_t dap_read_idcode(void)
 }
 
 //-----------------------------------------------------------------------------
+void dap_write_abort(void)
+{
+  dap_write_reg(SWD_DP_W_ABORT, 1);
+}
+
+//-----------------------------------------------------------------------------
 void dap_target_prepare(void)
 {
   dap_write_reg(SWD_DP_W_SELECT, 0x00000000);

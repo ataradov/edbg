@@ -88,7 +88,6 @@ static device_t devices[] =
   { 0x28ac0ce0, 0x00000000, "SAM 4S16C",	0x00400000, 1, 1024*1024,	512 },
   { 0x289c0ae0, 0x00000000, "SAM 4S8B",		0x00400000, 1, 512*1024,	512 },
   { 0x28ac0ae0, 0x00000000, "SAM 4S8C",		0x00400000, 1, 512*1024,	512 },
-
   { 0, 0, "", 0, 0, 0, 0 },
 };
 
@@ -100,6 +99,9 @@ static device_t *device;
 static void target_cm4_select(void)
 {
   uint32_t chip_id, chip_exid;
+
+  // Set boot mode GPNVM bit as a workaraound
+  dap_write_word(EEFC_FCR(0), CMD_SGPB | (1 << 8));
 
   // Stop the core
   dap_write_word(DHCSR, 0xa05f0003);
