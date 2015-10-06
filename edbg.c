@@ -332,7 +332,6 @@ int main(int argc, char **argv)
 
   target->ops->deselect();
 
-  dap_reset_target_hw();
   dap_disconnect();
   dap_led(0, 0);
 

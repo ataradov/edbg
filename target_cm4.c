@@ -106,7 +106,7 @@ static void target_cm4_select(void)
   // Stop the core
   dap_write_word(DHCSR, 0xa05f0003);
   dap_write_word(DEMCR, 0x00000001);
-  dap_write_word(AIRCR, 0xfa050004);
+  dap_write_word(AIRCR, 0x05fa0004);
 
   chip_id = dap_read_word(CHIPID_CIDR);
   chip_exid = dap_read_word(CHIPID_EXID);
@@ -152,8 +152,9 @@ static void target_cm4_select(void)
 //-----------------------------------------------------------------------------
 static void target_cm4_deselect(void)
 {
-  dap_write_word(DEMCR, 0x00000000);
   dap_write_word(DHCSR, 0xa05f0000);
+  dap_write_word(DEMCR, 0x00000000);
+  dap_write_word(AIRCR, 0x05fa0004);
 }
 
 //-----------------------------------------------------------------------------
