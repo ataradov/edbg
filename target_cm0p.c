@@ -66,6 +66,7 @@ static device_t devices[] =
   { 0x10010019, "SAM R21G18 ES",	0,	256*1024,	64,	4096,	256 },
   { 0x10010119, "SAM R21G18",		0,	256*1024,	64,	4096,	256 },
   { 0x10010219, "SAM R21G18 A",		0,	256*1024,	64,	4096,	256 },
+  { 0x11010100, "SAM C21J18A ES",	0,	256*1024,	64,	4096,	256 },
   { 0, "", 0, 0, 0, 0, 0 },
 };
 
@@ -148,6 +149,8 @@ static void target_cm0p_program(char *name)
   verbose("Programming...");
 
   number_of_rows = (size + device->row_size - 1) / device->row_size;
+
+  dap_write_word(0x41004004, 0); // Enable automatic write
 
   for (uint32_t row = 0; row < number_of_rows; row++)
   {
