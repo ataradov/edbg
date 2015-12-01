@@ -2,6 +2,7 @@ UNAME := $(shell uname)
 
 SRCS = \
   dap.c \
+  dbg.c \
   edbg.c \
   target.c \
   target_cm0p.c \
@@ -37,7 +38,7 @@ endif
 CFLAGS += -W -Wall -O2 -std=gnu99
 
 all: $(BIN)
-	
+
 $(BIN): $(SRCS) $(HDRS) $(HIDAPI)
 	gcc $(CFLAGS) $(SRCS) $(LIBS) -o $(BIN)
 

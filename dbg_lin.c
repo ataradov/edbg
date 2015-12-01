@@ -81,8 +81,7 @@ int dbg_enumerate(debugger_t *debuggers, int size)
     parent = udev_device_get_parent_with_subsystem_devtype(dev, "usb", "usb_device");
     check(parent, "unable to find parent usb device");
 
-    if (DBG_VID == strtol(udev_device_get_sysattr_value(parent, "idVendor"), NULL, 16) &&
-        DBG_PID == strtol(udev_device_get_sysattr_value(parent, "idProduct"), NULL, 16) &&
+    if (dbg_validate_dap(strtol(udev_device_get_sysattr_value(parent, "idVendor"), NULL, 16), strtol(udev_device_get_sysattr_value(parent, "idProduct"), NULL, 16)) != -1 &&
         rsize < size)
     {
       const char *serial = udev_device_get_sysattr_value(parent, "serial");
@@ -93,6 +92,8 @@ int dbg_enumerate(debugger_t *debuggers, int size)
       debuggers[rsize].serial = serial ? strdup(serial) : "<unknown>";
       debuggers[rsize].manufacturer = manufacturer ? strdup(manufacturer) : "<unknown>";
       debuggers[rsize].product = product ? strdup(product) : "<unknown>";
+      debuggers[rsize].VID = strtol(udev_device_get_sysattr_value(parent, "idVendor"), NULL, 16);
+      debuggers[rsize].PID = strtol(udev_device_get_sysattr_value(parent, "idProduct"), NULL, 16);
 
       rsize++;
     }

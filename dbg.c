@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015, Alex Taradov <alex@taradov.com>
+ * Copyright (c) 2015, Thibaut VIARD
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,45 +26,41 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _DBG_H_
-#define _DBG_H_
+#include "dbg.h"
 
-/*- Includes ----------------------------------------------------------------*/
-#include <stdint.h>
-#include <stdbool.h>
-
-/*- Definitions -------------------------------------------------------------*/
-#define DBG_VID_ATMEL             0x03eb
-#define DBG_PID_ATMEL_EDBG          0x2111
-#define DBG_PID_ATMEL_MEDBG         0x2145
-#define DBG_PID_ATMEL_ICE           0x2141
-#define DBG_PID_ARDUINO_ZERO        0x2157
-
-/*- Types -------------------------------------------------------------------*/
-typedef struct
+/*- Variables ---------------------------------------------------------------*/
+static const uint16_t dap_products_atmel[]=
 {
-  uint16_t vendor_id;
-  const uint16_t* products;
-} dap_vendor_t;
+  DBG_PID_ATMEL_EDBG, DBG_PID_ATMEL_MEDBG, DBG_PID_ATMEL_ICE, DBG_PID_ARDUINO_ZERO, 0
+};
 
-typedef struct
+static const dap_vendor_t dap_vendors[]=
 {
-  char     *path;
-  char     *serial;
-  wchar_t  *wserial;
-  char     *manufacturer;
-  char     *product;
-  uint16_t  VID;
-  uint16_t  PID;
-} debugger_t;
+  { DBG_VID_ATMEL, dap_products_atmel },
+  { 0, 0 } // End of array
+};
 
-/*- Prototypes --------------------------------------------------------------*/
-int dbg_enumerate(debugger_t *debuggers, int size);
-void dbg_open(debugger_t *debugger);
-void dbg_close(void);
-int dbg_dap_cmd(uint8_t *data, int size, int rsize);
+/*- Implementations ---------------------------------------------------------*/
 
-int dbg_validate_dap(uint16_t vendorid, uint16_t productid);
+//-----------------------------------------------------------------------------
+int dbg_validate_dap(uint16_t vendorid, uint16_t productid)
+{
+  int vendor, product;
 
-#endif // _DBG_H_
+  for (vendor=0; dap_vendors[vendor].vendor_id != 0; vendor++)
+  {
+    if (vendorid == dap_vendors[vendor].vendor_id)
+    {
+      // Found vendor, looking for product
+      for (product=0; dap_vendors[vendor].products[product] != 0; product++)
+      {
+        if (productid == dap_vendors[vendor].products[product])
+        {
+          return vendor<<16|product;
+        }
+      }
+    }
+  }
 
+  return -1;
+}
