@@ -30,7 +30,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <windows.h>
-#include <setupapi.h>          
+#include <setupapi.h>
 #include <ddk/hidsdi.h>
 #include <ddk/hidpi.h>
 #include "dbg.h"
@@ -88,7 +88,7 @@ int dbg_enumerate(debugger_t *debuggers, int size)
       hid_attr.Size = sizeof(hid_attr);
       HidD_GetAttributes(handle, &hid_attr);
 
-      if (DBG_VID == hid_attr.VendorID && DBG_PID == hid_attr.ProductID)
+      if (dbg_validate_dap(hid_attr.VendorID, hid_attr.ProductID) != -1)
       {
         wchar_t wstr[MAX_STRING_SIZE];
         char str[MAX_STRING_SIZE];
@@ -106,6 +106,9 @@ int dbg_enumerate(debugger_t *debuggers, int size)
         HidD_GetProductString(handle, (PVOID)wstr, MAX_STRING_SIZE);
         wcstombs(str, wstr, MAX_STRING_SIZE);
         debuggers[rsize].product = strdup(str);
+
+        debuggers[rsize].VID = hid_attr.VendorID;
+        debuggers[rsize].PID = hid_attr.ProductID;
 
         rsize++;
       }

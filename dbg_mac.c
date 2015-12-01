@@ -61,7 +61,7 @@ char * wcstombsdup(const wchar_t * const src)
 }
 
 //-----------------------------------------------------------------------------
-int dbg_enumerate(debugger_t *debuggers, int size) 
+int dbg_enumerate(debugger_t *debuggers, int size)
 {
   int rsize = 0;
 
@@ -71,16 +71,18 @@ int dbg_enumerate(debugger_t *debuggers, int size)
     return -1;
 
   devs = hid_enumerate(0x0, 0x0);
-  cur_dev = devs;	
+  cur_dev = devs;
   for(cur_dev = devs; cur_dev && rsize < size; cur_dev = cur_dev->next)
   {
-    if(DBG_VID == cur_dev->vendor_id && DBG_PID == cur_dev->product_id)
+    if(dbg_validate_dap(cur_dev->vendor_id, cur_dev->product_id) != -1)
     {
       debuggers[rsize].path = strdup(cur_dev->path);
       debuggers[rsize].serial = cur_dev->serial_number ? wcstombsdup(cur_dev->serial_number) : "<unknown>";
       debuggers[rsize].wserial = cur_dev->serial_number ? wcsdup(cur_dev->serial_number) : NULL;
       debuggers[rsize].manufacturer = cur_dev->manufacturer_string ? wcstombsdup(cur_dev->manufacturer_string) : "<unknown>";
       debuggers[rsize].product = cur_dev->product_string ? wcstombsdup(cur_dev->product_string) : "<unknown>";
+      debuggers[rsize].VID = cur_dev->vendor_id;
+      debuggers[rsize].PID = cur_dev->product_id;
 
       rsize++;
     }
@@ -93,7 +95,7 @@ int dbg_enumerate(debugger_t *debuggers, int size)
 //-----------------------------------------------------------------------------
 void dbg_open(debugger_t *debugger)
 {
-  handle = hid_open(DBG_VID, DBG_PID, debugger->wserial);
+  handle = hid_open(debugger->VID, debugger->PID, debugger->wserial);
   if (!handle)
     perror_exit("unable to open device");
 }
