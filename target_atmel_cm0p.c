@@ -59,17 +59,18 @@ typedef struct
 /*- Variables ---------------------------------------------------------------*/
 static device_t devices[] =
 {
-  { 0x10001100, "SAM D20J18A",		0,	256*1024,	64,	4096,	256 },
-  { 0x10010100, "SAM D21J18A",		0,	256*1024,	64,	4096,	256 },
-  { 0x10010200, "SAM D21J18A Rev C",	0,	256*1024,	64,	4096,	256 },
-  { 0x10010205, "SAM D21G18A",		0,	256*1024,	64,	4096,	256 },
-  { 0x10010019, "SAM R21G18 ES",	0,	256*1024,	64,	4096,	256 },
-  { 0x10010119, "SAM R21G18",		0,	256*1024,	64,	4096,	256 },
-  { 0x10010219, "SAM R21G18 A",		0,	256*1024,	64,	4096,	256 },
-  { 0x11010100, "SAM C21J18A ES",	0,	256*1024,	64,	4096,	256 },
-  { 0x10030000, "SAM D11D14AM",	0,	16*1024,	64,	256,	256 },
-  { 0x10030003, "SAM D11D14AS",	0,	16*1024,	64,	256,	256 },
-  { 0x10030006, "SAM D11C14A",	0,	16*1024,	64,	256,	256 },
+  { 0x10020100, "SAM D10D14AM",      0,  16*1024, 64,  256, 256 },
+  { 0x10030000, "SAM D11D14AM",      0,  16*1024, 64,  256, 256 },
+  { 0x10030003, "SAM D11D14AS",      0,  16*1024, 64,  256, 256 },
+  { 0x10030006, "SAM D11C14A",       0,  16*1024, 64,  256, 256 },
+  { 0x10001100, "SAM D20J18A",       0, 256*1024, 64, 4096, 256 },
+  { 0x10010100, "SAM D21J18A",       0, 256*1024, 64, 4096, 256 },
+  { 0x10010200, "SAM D21J18A Rev C", 0, 256*1024, 64, 4096, 256 },
+  { 0x10010205, "SAM D21G18A",       0, 256*1024, 64, 4096, 256 },
+  { 0x10010019, "SAM R21G18 ES",     0, 256*1024, 64, 4096, 256 },
+  { 0x10010119, "SAM R21G18",        0, 256*1024, 64, 4096, 256 },
+  { 0x10010219, "SAM R21G18 A",      0, 256*1024, 64, 4096, 256 },
+  { 0x11010100, "SAM C21J18A ES",    0, 256*1024, 64, 4096, 256 },
   { 0, "", 0, 0, 0, 0, 0 },
 };
 
@@ -78,7 +79,7 @@ static device_t *device;
 /*- Implementations ---------------------------------------------------------*/
 
 //-----------------------------------------------------------------------------
-static void target_cm0p_select(void)
+static void target_select(void)
 {
   uint32_t dsu_did;
 
@@ -102,7 +103,7 @@ static void target_cm0p_select(void)
 }
 
 //-----------------------------------------------------------------------------
-static void target_cm0p_deselect(void)
+static void target_deselect(void)
 {
   dap_write_word(DHCSR, 0xa05f0000);
   dap_write_word(DEMCR, 0x00000000);
@@ -110,7 +111,7 @@ static void target_cm0p_deselect(void)
 }
 
 //-----------------------------------------------------------------------------
-static void target_cm0p_erase(void)
+static void target_erase(void)
 {
   verbose("Erasing... ");
 
@@ -123,7 +124,7 @@ static void target_cm0p_erase(void)
 }
 
 //-----------------------------------------------------------------------------
-static void target_cm0p_lock(void)
+static void target_lock(void)
 {
   verbose("Locking... ");
 
@@ -133,7 +134,7 @@ static void target_cm0p_lock(void)
 }
 
 //-----------------------------------------------------------------------------
-static void target_cm0p_program(char *name)
+static void target_program(char *name)
 {
   uint32_t addr = device->flash_start;
   uint32_t size;
@@ -180,7 +181,7 @@ static void target_cm0p_program(char *name)
 }
 
 //-----------------------------------------------------------------------------
-static void target_cm0p_verify(char *name)
+static void target_verify(char *name)
 {
   uint32_t addr = device->flash_start;
   uint32_t size, block_size;
@@ -229,7 +230,7 @@ static void target_cm0p_verify(char *name)
 }
 
 //-----------------------------------------------------------------------------
-static void target_cm0p_read(char *name)
+static void target_read(char *name)
 {
   uint32_t size = device->flash_size;
   uint32_t addr = device->flash_start;
@@ -262,14 +263,14 @@ static void target_cm0p_read(char *name)
 }
 
 //-----------------------------------------------------------------------------
-target_ops_t target_cm0p_ops =
+target_ops_t target_atmel_cm0p_ops =
 {
-  .select   = target_cm0p_select,
-  .deselect = target_cm0p_deselect,
-  .erase    = target_cm0p_erase,
-  .lock     = target_cm0p_lock,
-  .program  = target_cm0p_program,
-  .verify   = target_cm0p_verify,
-  .read     = target_cm0p_read,
+  .select   = target_select,
+  .deselect = target_deselect,
+  .erase    = target_erase,
+  .lock     = target_lock,
+  .program  = target_program,
+  .verify   = target_verify,
+  .read     = target_read,
 };
 

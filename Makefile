@@ -4,9 +4,9 @@ SRCS = \
   dap.c \
   edbg.c \
   target.c \
-  target_cm0p.c \
-  target_cm4.c \
-  target_cm7.c
+  target_atmel_cm0p.c \
+  target_atmel_cm4.c \
+  target_atmel_cm7.c
 
 HDRS = \
   dap.h \

@@ -37,54 +37,53 @@
 #include "edbg.h"
 #include "dbg.h"
 
-/*- Definitions -------------------------------------------------------------*/
-#define HID_BUFFER_SIZE   513 // Atmel EDBG expects 512 bytes + 1 byte for report ID
-
-/*- Types -------------------------------------------------------------------*/
-
 /*- Variables ---------------------------------------------------------------*/
 static hid_device *handle = NULL;
-static uint8_t hid_buffer[HID_BUFFER_SIZE];
+static uint8_t hid_buffer[1024 + 1];
 
 /*- Implementations ---------------------------------------------------------*/
 
-char * wcstombsdup(const wchar_t * const src)
+//-----------------------------------------------------------------------------
+char *wcstombsdup(const wchar_t * const src)
 {
   const int len = wcslen(src);
-  char * const dst = malloc(len+1);
-  if(dst)
+  char * const dst = malloc(len + 1);
+
+  if (dst)
   {
     wcstombs(dst, src, len);
     dst[len] = '\0';
   }
-  return(dst);
+
+  return dst;
 }
 
 //-----------------------------------------------------------------------------
 int dbg_enumerate(debugger_t *debuggers, int size) 
 {
+  struct hid_device_info *devs, *cur_dev;
   int rsize = 0;
 
-  struct hid_device_info *devs, *cur_dev;
-
   if (hid_init())
-    return -1;
+    return 0;
 
-  devs = hid_enumerate(0x0, 0x0);
+  devs = hid_enumerate(0, 0);
   cur_dev = devs;	
-  for(cur_dev = devs; cur_dev && rsize < size; cur_dev = cur_dev->next)
-  {
-    if(DBG_VID == cur_dev->vendor_id && DBG_PID == cur_dev->product_id)
-    {
-      debuggers[rsize].path = strdup(cur_dev->path);
-      debuggers[rsize].serial = cur_dev->serial_number ? wcstombsdup(cur_dev->serial_number) : "<unknown>";
-      debuggers[rsize].wserial = cur_dev->serial_number ? wcsdup(cur_dev->serial_number) : NULL;
-      debuggers[rsize].manufacturer = cur_dev->manufacturer_string ? wcstombsdup(cur_dev->manufacturer_string) : "<unknown>";
-      debuggers[rsize].product = cur_dev->product_string ? wcstombsdup(cur_dev->product_string) : "<unknown>";
 
+  for (cur_dev = devs; cur_dev && rsize < size; cur_dev = cur_dev->next)
+  {
+    debuggers[rsize].path = strdup(cur_dev->path);
+    debuggers[rsize].serial = cur_dev->serial_number ? wcstombsdup(cur_dev->serial_number) : "<unknown>";
+    debuggers[rsize].wserial = cur_dev->serial_number ? wcsdup(cur_dev->serial_number) : NULL;
+    debuggers[rsize].manufacturer = cur_dev->manufacturer_string ? wcstombsdup(cur_dev->manufacturer_string) : "<unknown>";
+    debuggers[rsize].product = cur_dev->product_string ? wcstombsdup(cur_dev->product_string) : "<unknown>";
+    debuggers[rsize].vid = cur_dev->vendor_id;
+    debuggers[rsize].pid = cur_dev->product_id;
+
+    if (strstr(debuggers[rsize].product, "CMSIS-DAP"))
       rsize++;
-    }
   }
+
   hid_free_enumeration(devs);
 
   return rsize;
@@ -93,7 +92,8 @@ int dbg_enumerate(debugger_t *debuggers, int size)
 //-----------------------------------------------------------------------------
 void dbg_open(debugger_t *debugger)
 {
-  handle = hid_open(DBG_VID, DBG_PID, debugger->wserial);
+  handle = hid_open(debugger->vid, debugger->pid, debugger->wserial);
+
   if (!handle)
     perror_exit("unable to open device");
 }
@@ -106,24 +106,31 @@ void dbg_close(void)
 }
 
 //-----------------------------------------------------------------------------
+int dbg_get_report_size(void)
+{
+  // TODO: implement
+  return 512;
+}
+
+//-----------------------------------------------------------------------------
 int dbg_dap_cmd(uint8_t *data, int size, int rsize)
 {
   char cmd = data[0];
   int res;
 
-  memset(hid_buffer, 0xff, HID_BUFFER_SIZE);
+  memset(hid_buffer, 0xff, report_size + 1);
 
   hid_buffer[0] = 0x00; // Report ID
   memcpy(&hid_buffer[1], data, rsize);
 
-  res = hid_write(handle, hid_buffer, HID_BUFFER_SIZE/*rsize+1*/); // Atmel EDBG expects 512 bytes
+  res = hid_write(handle, hid_buffer, report_size + 1);
   if (res < 0)
   {
     printf("Error: %ls\n", hid_error(handle));
     perror_exit("debugger write()");
   }
 
-  res = hid_read(handle, hid_buffer, sizeof(hid_buffer));
+  res = hid_read(handle, hid_buffer, report_size + 1);
   if (res < 0)
     perror_exit("debugger read()");
 

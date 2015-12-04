@@ -43,14 +43,10 @@
 #include "edbg.h"
 #include "dbg.h"
 
-/*- Definitions -------------------------------------------------------------*/
-#define HID_BUFFER_SIZE   513 // Atmel EDBG expects 512 bytes + 1 byte for report ID
-
-/*- Types -------------------------------------------------------------------*/
-
 /*- Variables ---------------------------------------------------------------*/
 static int debugger_fd = -1;
-static uint8_t hid_buffer[HID_BUFFER_SIZE];
+static uint8_t hid_buffer[1024 + 1];
+static int report_size = 0;
 
 /*- Implementations ---------------------------------------------------------*/
 
@@ -81,9 +77,7 @@ int dbg_enumerate(debugger_t *debuggers, int size)
     parent = udev_device_get_parent_with_subsystem_devtype(dev, "usb", "usb_device");
     check(parent, "unable to find parent usb device");
 
-    if (DBG_VID == strtol(udev_device_get_sysattr_value(parent, "idVendor"), NULL, 16) &&
-        DBG_PID == strtol(udev_device_get_sysattr_value(parent, "idProduct"), NULL, 16) &&
-        rsize < size)
+    if (rsize < size)
     {
       const char *serial = udev_device_get_sysattr_value(parent, "serial");
       const char *manufacturer = udev_device_get_sysattr_value(parent, "manufacturer");
@@ -93,8 +87,11 @@ int dbg_enumerate(debugger_t *debuggers, int size)
       debuggers[rsize].serial = serial ? strdup(serial) : "<unknown>";
       debuggers[rsize].manufacturer = manufacturer ? strdup(manufacturer) : "<unknown>";
       debuggers[rsize].product = product ? strdup(product) : "<unknown>";
+      debuggers[rsize].vid = strtol(udev_device_get_sysattr_value(parent, "idVendor"), NULL, 16);
+      debuggers[rsize].pid = strtol(udev_device_get_sysattr_value(parent, "idProduct"), NULL, 16);
 
-      rsize++;
+      if (strstr(debuggers[rsize].product, "CMSIS-DAP"))
+        rsize++;
     }
 
     udev_device_unref(parent);
@@ -107,12 +104,71 @@ int dbg_enumerate(debugger_t *debuggers, int size)
 }
 
 //-----------------------------------------------------------------------------
+static int parse_hid_report_desc(uint8_t *data, int size)
+{
+  uint32_t count = 0;
+  uint32_t input = 0;
+  uint32_t output = 0;
+
+  // This is a very primitive parser, but CMSIS-DAP descriptors are pretty uniform
+  for (int i = 0; i < size; )
+  {
+    int prefix = data[i++];
+    int bTag = (prefix >> 4) & 0x0f;
+    int bType = (prefix >> 2) & 0x03;
+    int bSize = prefix & 0x03;
+
+    bSize = (3 == bSize) ? 4 : bSize;
+
+    if (1 == bType && 9 == bTag)
+    {
+      count = 0;
+
+      for (int j = 0; j < bSize; j++)
+        count |= (data[i + j] << (j * 8));
+    }
+    else if (0 == bType && 8 == bTag)
+      input = count;
+    else if (0 == bType && 9 == bTag)
+      output = count;
+
+    i += bSize;
+  }
+
+  if (input != output)
+    error_exit("input and output report sizes do not match");
+
+  if (64 != input && 512 != input && 1024 != input)
+    error_exit("detected report size (%d) is not 64, 512 or 1024", input);
+
+  return input;
+}
+
+//-----------------------------------------------------------------------------
 void dbg_open(debugger_t *debugger)
 {
+  struct hidraw_report_descriptor rpt_desc;
+  struct hidraw_devinfo info;
+  int desc_size, res;
+
   debugger_fd = open(debugger->path, O_RDWR);
 
   if (debugger_fd < 0)
     perror_exit("unable to open device");
+
+  memset(&rpt_desc, 0, sizeof(rpt_desc));
+  memset(&info, 0, sizeof(info));
+
+  res = ioctl(debugger_fd, HIDIOCGRDESCSIZE, &desc_size);
+  if (res < 0)
+    perror_exit("debugger ioctl()");
+
+  rpt_desc.size = desc_size;
+  res = ioctl(debugger_fd, HIDIOCGRDESC, &rpt_desc);
+  if (res < 0)
+    perror_exit("debugger ioctl()");
+
+  report_size = parse_hid_report_desc(rpt_desc.value, rpt_desc.size);
 }
 
 //-----------------------------------------------------------------------------
@@ -123,21 +179,27 @@ void dbg_close(void)
 }
 
 //-----------------------------------------------------------------------------
+int dbg_get_report_size(void)
+{
+  return report_size;
+}
+
+//-----------------------------------------------------------------------------
 int dbg_dap_cmd(uint8_t *data, int size, int rsize)
 {
   char cmd = data[0];
   int res;
 
-  memset(hid_buffer, 0xff, HID_BUFFER_SIZE);
+  memset(hid_buffer, 0xff, report_size + 1);
 
   hid_buffer[0] = 0x00; // Report ID
   memcpy(&hid_buffer[1], data, rsize);
 
-  res = write(debugger_fd, hid_buffer, HID_BUFFER_SIZE/*rsize+1*/); // Atmel EDBG expects 512 bytes
+  res = write(debugger_fd, hid_buffer, report_size + 1);
   if (res < 0)
     perror_exit("debugger write()");
 
-  res = read(debugger_fd, hid_buffer, sizeof(hid_buffer));
+  res = read(debugger_fd, hid_buffer, report_size + 1);
   if (res < 0)
     perror_exit("debugger read()");
 

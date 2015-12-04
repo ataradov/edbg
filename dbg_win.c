@@ -37,14 +37,12 @@
 #include "edbg.h"
 
 /*- Definitions -------------------------------------------------------------*/
-#define HID_BUFFER_SIZE   513 // Atmel EDBG expects 512 bytes + 1 byte for report ID
 #define MAX_STRING_SIZE   256
-
-/*- Types -------------------------------------------------------------------*/
 
 /*- Variables ---------------------------------------------------------------*/
 static HANDLE debugger_handle = INVALID_HANDLE_VALUE;
-static uint8_t hid_buffer[HID_BUFFER_SIZE];
+static uint8_t hid_buffer[1024 + 1];
+static int report_size = 0;
 
 /*- Implementations ---------------------------------------------------------*/
 
@@ -85,30 +83,31 @@ int dbg_enumerate(debugger_t *debuggers, int size)
 
     if (INVALID_HANDLE_VALUE != handle)
     {
+      wchar_t wstr[MAX_STRING_SIZE];
+      char str[MAX_STRING_SIZE];
+
       hid_attr.Size = sizeof(hid_attr);
       HidD_GetAttributes(handle, &hid_attr);
 
-      if (DBG_VID == hid_attr.VendorID && DBG_PID == hid_attr.ProductID)
-      {
-        wchar_t wstr[MAX_STRING_SIZE];
-        char str[MAX_STRING_SIZE];
+      debuggers[rsize].path = strdup(detail_data->DevicePath);
 
-        debuggers[rsize].path = strdup(detail_data->DevicePath);
+      HidD_GetSerialNumberString(handle, (PVOID)wstr, MAX_STRING_SIZE);
+      wcstombs(str, wstr, MAX_STRING_SIZE);
+      debuggers[rsize].serial = strdup(str);
 
-        HidD_GetSerialNumberString(handle, (PVOID)wstr, MAX_STRING_SIZE);
-        wcstombs(str, wstr, MAX_STRING_SIZE);
-        debuggers[rsize].serial = strdup(str);
+      HidD_GetManufacturerString(handle, (PVOID)wstr, MAX_STRING_SIZE);
+      wcstombs(str, wstr, MAX_STRING_SIZE);
+      debuggers[rsize].manufacturer = strdup(str);
 
-        HidD_GetManufacturerString(handle, (PVOID)wstr, MAX_STRING_SIZE);
-        wcstombs(str, wstr, MAX_STRING_SIZE);
-        debuggers[rsize].manufacturer = strdup(str);
+      HidD_GetProductString(handle, (PVOID)wstr, MAX_STRING_SIZE);
+      wcstombs(str, wstr, MAX_STRING_SIZE);
+      debuggers[rsize].product = strdup(str);
 
-        HidD_GetProductString(handle, (PVOID)wstr, MAX_STRING_SIZE);
-        wcstombs(str, wstr, MAX_STRING_SIZE);
-        debuggers[rsize].product = strdup(str);
+      debuggers[rsize].vid = hid_attr.VendorID;
+      debuggers[rsize].pid = hid_attr.ProductID;
 
+      if (strstr(debuggers[rsize].product, "CMSIS-DAP"))
         rsize++;
-      }
 
       CloseHandle(handle);
     }
@@ -124,11 +123,29 @@ int dbg_enumerate(debugger_t *debuggers, int size)
 //-----------------------------------------------------------------------------
 void dbg_open(debugger_t *debugger)
 {
+  HIDP_CAPS caps;
+  PHIDP_PREPARSED_DATA prep;
+  int input, output;
+
   debugger_handle = CreateFile(debugger->path, GENERIC_READ | GENERIC_WRITE,
-        FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+      FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
 
   if (INVALID_HANDLE_VALUE == debugger_handle)
     error_exit("unable to open device");
+
+  HidD_GetPreparsedData(debugger_handle, &prep);
+  HidP_GetCaps(prep, &caps);
+
+  input = caps.InputReportByteLength - 1;
+  output = caps.OutputReportByteLength - 1;
+
+  if (input != output)
+    error_exit("input and output report sizes do not match");
+
+  if (64 != input && 512 != input && 1024 != input)
+    error_exit("detected report size (%d) is not 64, 512 or 1024", input);
+
+  report_size = input;
 }
 
 //-----------------------------------------------------------------------------
@@ -139,20 +156,26 @@ void dbg_close(void)
 }
 
 //-----------------------------------------------------------------------------
+int dbg_get_report_size(void)
+{
+  return report_size;
+}
+
+//-----------------------------------------------------------------------------
 int dbg_dap_cmd(uint8_t *data, int size, int rsize)
 {
   char cmd = data[0];
   long res;
 
-  memset(hid_buffer, 0xff, HID_BUFFER_SIZE);
+  memset(hid_buffer, 0xff, report_size + 1);
 
   hid_buffer[0] = 0x00; // Report ID
   memcpy(&hid_buffer[1], data, rsize);
 
-  if (FALSE == WriteFile(debugger_handle, (LPCVOID)hid_buffer, HID_BUFFER_SIZE, &res, NULL))
+  if (FALSE == WriteFile(debugger_handle, (LPCVOID)hid_buffer, report_size + 1, &res, NULL))
     error_exit("debugger write()");
 
-  if (FALSE == ReadFile(debugger_handle, (LPVOID)hid_buffer, HID_BUFFER_SIZE, &res, NULL))
+  if (FALSE == ReadFile(debugger_handle, (LPVOID)hid_buffer, report_size + 1, &res, NULL))
     error_exit("debugger read()");
 
   check(hid_buffer[1] == cmd, "invalid response received");

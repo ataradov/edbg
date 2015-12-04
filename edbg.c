@@ -44,6 +44,8 @@
 #include "dbg.h"
 
 /*- Definitions -------------------------------------------------------------*/
+#define VERSION           "v0.2"
+
 #define MAX_DEBUGGERS     20
 #define DAP_FREQ          16000000 // Hz
 
@@ -63,13 +65,14 @@ static const struct option long_options[] =
   { "lock",      no_argument,        0, 'k' },
   { "read",      no_argument,        0, 'r' },
   { "file",      required_argument,  0, 'f' },
+  { "target",    required_argument,  0, 't' },
   { "list",      no_argument,        0, 'l' },
   { "serial",    required_argument,  0, 's' },
   { "verbose",   no_argument,        0, 'b' },
   { 0, 0, 0, 0 }
 };
 
-static const char *short_options = "hepvkrf:ls:b";
+static const char *short_options = "hepvkrf:t:ls:b";
 
 static bool g_erase = false;
 static bool g_program = false;
@@ -79,6 +82,7 @@ static bool g_read = false;
 static char *g_file = NULL;
 static char *g_serial = NULL;
 static bool g_list = false;
+static char *g_target = NULL;
 static bool g_verbose = false;
 
 /*- Implementations ---------------------------------------------------------*/
@@ -212,7 +216,7 @@ void save_file(char *name, uint8_t *data, int size)
 //-----------------------------------------------------------------------------
 static void print_help(char *name)
 {
-  printf("Atmel EDBG programmer v0.12, built " __DATE__ " " __TIME__ " \n");
+  printf("CMSIS-DAP SWD programmer " VERSION ", built " __DATE__ " " __TIME__ " \n");
   printf("Usage: %s [options]\n", name);
   printf("Options:\n");
   printf("  -h, --help                 print this help message and exit\n");
@@ -222,6 +226,7 @@ static void print_help(char *name)
   printf("  -k, --lock                 lock the chip (set security bit)\n");
   printf("  -r, --read                 read the contents of the chip\n");
   printf("  -f, --file <file>          binary file to be programmed or verified\n");
+  printf("  -t, --target <name>        specify a traget type (use '-t list' for a list of supported target types\n");
   printf("  -l, --list                 list all available debuggers\n");
   printf("  -s, --serial <number>      use a debugger with a specified serial number\n");
   printf("  -b, --verbose              print verbose messages\n");
@@ -245,6 +250,7 @@ static void parse_command_line(int argc, char **argv)
       case 'k': g_lock = true; break;
       case 'r': g_read = true; break;
       case 'f': g_file = optarg; break;
+      case 't': g_target = optarg; break;
       case 'l': g_list = true; break;
       case 's': g_serial = optarg; break;
       case 'b': g_verbose = true; break;
@@ -252,7 +258,7 @@ static void parse_command_line(int argc, char **argv)
     }
   }
 
-  check(optind >= argc, "malformed command line, use -h for more information");
+  check(optind >= argc, "malformed command line, use '-h' for more information");
 }
 
 //-----------------------------------------------------------------------------
@@ -265,7 +271,7 @@ int main(int argc, char **argv)
 
   parse_command_line(argc, argv);
 
-  if (!(g_erase || g_program || g_verify || g_lock || g_read || g_list))
+  if (!(g_erase || g_program || g_verify || g_lock || g_read || g_list || g_target))
     error_exit("no actions specified");
 
   if (g_read && (g_erase || g_program || g_verify || g_lock))
@@ -281,14 +287,30 @@ int main(int argc, char **argv)
     return 0;
   }
 
+  if (NULL == g_target)
+    error_exit("no target type specified (use '-t' option)");
+
+  if (0 == strcmp("list", g_target))
+  {
+    target_list();
+    return 0;
+  }
+
+  target = target_get_ops(g_target);
+
   if (g_serial)
   {
     for (int i = 0; i < n_debuggers; i++)
+    {
       if (0 == strcmp(debuggers[i].serial, g_serial))
+      {
         debugger = i;
+        break;
+      }
+    }
 
     if (-1 == debugger)
-      error_exit("unable to find a debugger with specified serial number");
+      error_exit("unable to find a debugger with a specified serial number");
   }
 
   if (0 == n_debuggers)
@@ -303,14 +325,11 @@ int main(int argc, char **argv)
   dap_disconnect();
   dap_get_debugger_info();
   dap_connect();
-  dap_transfer_configure(0, 4096, 0);
+  dap_transfer_configure(0, 128, 128);
   dap_swd_configure(0);
   dap_led(0, 1);
-  dap_reset_target();
   dap_reset_link();
   dap_swj_clock(DAP_FREQ);
-
-  target = target_identify();
   dap_target_prepare();
 
   target->ops->select();

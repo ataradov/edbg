@@ -86,6 +86,17 @@ enum
 
 enum
 {
+  DAP_TRANSFER_INVALID      = 0,
+  DAP_TRANSFER_OK           = 1 << 0,
+  DAP_TRANSFER_WAIT         = 1 << 1,
+  DAP_TRANSFER_FAULT        = 1 << 2,
+  DAP_TRANSFER_ERROR        = 1 << 3,
+  DAP_TRANSFER_MISMATCH     = 1 << 4,
+  DAP_TRANSFER_NO_TARGET    = 7,
+};
+
+enum
+{
   DAP_PORT_SWD   = 1 << 0,
   DAP_PORT_JTAG  = 1 << 1,
 };
@@ -219,48 +230,45 @@ void dap_swd_configure(uint8_t cfg)
 void dap_get_debugger_info(void)
 {
   uint8_t buf[100];
-  char str[500];
-  char *ptr = str;
+  char str[500] = "";
 
   buf[0] = ID_DAP_INFO;
   buf[1] = DAP_INFO_VENDOR;
   dbg_dap_cmd(buf, sizeof(buf), 2);
-  memcpy(ptr, &buf[1], buf[0]-1); // -1 to adjust for trailing zero
-  ptr += buf[0]-1;
-  *ptr++ = ' ';
+  strncat(str, (char *)&buf[1], buf[0]);
+  strcat(str, " ");
 
   buf[0] = ID_DAP_INFO;
   buf[1] = DAP_INFO_PRODUCT;
   dbg_dap_cmd(buf, sizeof(buf), 2);
-  memcpy(ptr, &buf[1], buf[0]-1);
-  ptr += buf[0]-1;
-  *ptr++ = ' ';
+  strncat(str, (char *)&buf[1], buf[0]);
+  strcat(str, " ");
 
   buf[0] = ID_DAP_INFO;
   buf[1] = DAP_INFO_SER_NUM;
   dbg_dap_cmd(buf, sizeof(buf), 2);
-  memcpy(ptr, &buf[1], buf[0]-1);
-  ptr += buf[0]-1;
-  *ptr++ = ' ';
+  strncat(str, (char *)&buf[1], buf[0]);
+  strcat(str, " ");
 
   buf[0] = ID_DAP_INFO;
   buf[1] = DAP_INFO_FW_VER;
   dbg_dap_cmd(buf, sizeof(buf), 2);
-  memcpy(ptr, &buf[1], buf[0]-1);
-  ptr += buf[0]-1;
-  *ptr++ = ' ';
+  strncat(str, (char *)&buf[1], buf[0]);
+  strcat(str, " ");
 
   buf[0] = ID_DAP_INFO;
   buf[1] = DAP_INFO_CAPABILITIES;
   dbg_dap_cmd(buf, sizeof(buf), 2);
 
-  *ptr++ = '(';
+  strcat(str, "(");
+
   if (buf[1] & DAP_PORT_SWD)
-    *ptr++ = 'S';
+    strcat(str, "S");
+
   if (buf[1] & DAP_PORT_JTAG)
-    *ptr++ = 'J';
-  *ptr++ = ')';
-  *ptr = 0;
+    strcat(str, "J");
+
+  strcat(str, ")");
 
   verbose("Debugger: %s\n", str);
 
@@ -315,7 +323,7 @@ uint32_t dap_read_reg(uint8_t reg)
   buf[3] = reg | DAP_TRANSFER_RnW;
   dbg_dap_cmd(buf, sizeof(buf), 4);
 
-  if (1 != buf[0] || 1 != buf[1])
+  if (1 != buf[0] || DAP_TRANSFER_OK != buf[1])
   {
     error_exit("invalid response while reading the register 0x%02x (count = %d, value = %d)",
         reg, buf[0], buf[1]);
@@ -340,7 +348,7 @@ void dap_write_reg(uint8_t reg, uint32_t data)
   buf[7] = (data >> 24) & 0xff;
   dbg_dap_cmd(buf, sizeof(buf), 8);
 
-  if (1 != buf[0] || 1 != buf[1])
+  if (1 != buf[0] || DAP_TRANSFER_OK != buf[1])
   {
     error_exit("invalid response while writing the register 0x%02x (count = %d, value = %d)",
         reg, buf[0], buf[1]);
@@ -364,73 +372,113 @@ void dap_write_word(uint32_t addr, uint32_t data)
 //-----------------------------------------------------------------------------
 void dap_read_block(uint32_t addr, uint8_t *data, int size)
 {
-  uint8_t buf[512];
+  int max_size = (dbg_get_report_size() - 5) & ~3;
+  int offs = 0;
 
-  dap_write_reg(SWD_AP_TAR, addr);
+  while (size)
+  {
+    int align, sz;
+    uint8_t buf[1024];
 
-  buf[0] = ID_DAP_TRANSFER_BLOCK;
-  buf[1] = 0x00; // DAP index
-  buf[2] = (size / 4) & 0xff;
-  buf[3] = ((size / 4) >> 8) & 0xff;
-  buf[4] = SWD_AP_DRW | DAP_TRANSFER_RnW | DAP_TRANSFER_APnDP;
-  dbg_dap_cmd(buf, sizeof(buf), 5);
+    align = 0x400 - (addr - (addr & ~0x3ff));
+    sz = (size > max_size) ? max_size : size;
+    sz = (sz > align) ? align : sz;
 
-  memcpy(data, &buf[3], size);
+    dap_write_reg(SWD_AP_TAR, addr);
+
+    buf[0] = ID_DAP_TRANSFER_BLOCK;
+    buf[1] = 0x00; // DAP index
+    buf[2] = (sz / 4) & 0xff;
+    buf[3] = ((sz / 4) >> 8) & 0xff;
+    buf[4] = SWD_AP_DRW | DAP_TRANSFER_RnW | DAP_TRANSFER_APnDP;
+    dbg_dap_cmd(buf, sizeof(buf), 5);
+
+    if (DAP_TRANSFER_OK != buf[2])
+    {
+      error_exit("invalid response while reading the block at 0x%08x (value = %d)",
+          addr, buf[2]);
+    }
+
+    memcpy(&data[offs], &buf[3], sz);
+
+    size -= sz;
+    addr += sz;
+    offs += sz;
+  }
 }
 
 //-----------------------------------------------------------------------------
 void dap_write_block(uint32_t addr, uint8_t *data, int size)
 {
-  uint8_t buf[512];
+  int max_size = (dbg_get_report_size() - 5) & ~3;
+  int offs = 0;
 
-  dap_write_reg(SWD_AP_TAR, addr);
+  while (size)
+  {
+    int align, sz;
+    uint8_t buf[1024];
 
-  buf[0] = ID_DAP_TRANSFER_BLOCK;
-  buf[1] = 0x00; // DAP index
-  buf[2] = (size / 4) & 0xff;
-  buf[3] = ((size / 4) >> 8) & 0xff;
-  buf[4] = SWD_AP_DRW | DAP_TRANSFER_APnDP;
-  memcpy(&buf[5], data, size);
-  dbg_dap_cmd(buf, sizeof(buf), 5 + size);
+    align = 0x400 - (addr - (addr & ~0x3ff));
+    sz = (size > max_size) ? max_size : size;
+    sz = (sz > align) ? align : sz;
+
+    dap_write_reg(SWD_AP_TAR, addr);
+
+    buf[0] = ID_DAP_TRANSFER_BLOCK;
+    buf[1] = 0x00; // DAP index
+    buf[2] = (sz / 4) & 0xff;
+    buf[3] = ((sz / 4) >> 8) & 0xff;
+    buf[4] = SWD_AP_DRW | DAP_TRANSFER_APnDP;
+    memcpy(&buf[5], &data[offs], sz);
+    dbg_dap_cmd(buf, sizeof(buf), 5 + sz);
+
+    if (DAP_TRANSFER_OK != buf[2])
+    {
+      error_exit("invalid response while writing the block at 0x%08x (value = %d)",
+          addr, buf[2]);
+    }
+
+    size -= sz;
+    addr += sz;
+    offs += sz;
+  }
 }
 
 //-----------------------------------------------------------------------------
 void dap_reset_link(void)
 {
-  uint8_t buf[9];
+  uint8_t buf[128];
 
   //-------------
   buf[0] = ID_DAP_SWJ_SEQUENCE;
-  buf[1] = 7 * 8;
-  memset(&buf[2], 0xff, 7);
-  dbg_dap_cmd(buf, sizeof(buf), 9);
+  buf[1] = (7 + 2 + 7 + 1) * 8;
+  buf[2] = 0xff;
+  buf[3] = 0xff;
+  buf[4] = 0xff;
+  buf[5] = 0xff;
+  buf[6] = 0xff;
+  buf[7] = 0xff;
+  buf[8] = 0xff;
+  buf[9] = 0x9e;
+  buf[10] = 0xe7;
+  buf[11] = 0xff;
+  buf[12] = 0xff;
+  buf[13] = 0xff;
+  buf[14] = 0xff;
+  buf[15] = 0xff;
+  buf[16] = 0xff;
+  buf[17] = 0xff;
+  buf[18] = 0x00;
 
+  dbg_dap_cmd(buf, sizeof(buf), 19);
   check(DAP_OK == buf[0], "SWJ_SEQUENCE failed");
 
   //-------------
-  buf[0] = ID_DAP_SWJ_SEQUENCE;
-  buf[1] = 2 * 8;
-  buf[2] = 0x9e;
-  buf[3] = 0xe7;
+  buf[0] = ID_DAP_TRANSFER;
+  buf[1] = 0; // DAP index
+  buf[2] = 1; // Request size
+  buf[3] = SWD_DP_R_IDCODE | DAP_TRANSFER_RnW;
   dbg_dap_cmd(buf, sizeof(buf), 4);
-
-  check(DAP_OK == buf[0], "SWJ_SEQUENCE failed");
-
-  //-------------
-  buf[0] = ID_DAP_SWJ_SEQUENCE;
-  buf[1] = 7 * 8;
-  memset(&buf[2], 0xff, 7);
-  dbg_dap_cmd(buf, sizeof(buf), 9);
-
-  check(DAP_OK == buf[0], "SWJ_SEQUENCE failed");
-
-  //-------------
-  buf[0] = ID_DAP_SWJ_SEQUENCE;
-  buf[1] = 8;
-  buf[2] = 0x00;
-  dbg_dap_cmd(buf, sizeof(buf), 3);
-
-  check(DAP_OK == buf[0], "SWJ_SEQUENCE failed");
 }
 
 //-----------------------------------------------------------------------------
@@ -440,14 +488,9 @@ uint32_t dap_read_idcode(void)
 }
 
 //-----------------------------------------------------------------------------
-void dap_write_abort(void)
-{
-  dap_write_reg(SWD_DP_W_ABORT, 1);
-}
-
-//-----------------------------------------------------------------------------
 void dap_target_prepare(void)
 {
+  dap_write_reg(SWD_DP_W_ABORT, 0x00000016);
   dap_write_reg(SWD_DP_W_SELECT, 0x00000000);
   dap_write_reg(SWD_DP_W_CTRL_STAT, 0x50000f00);
   dap_write_reg(SWD_AP_CSW, 0x23000052);

@@ -47,13 +47,14 @@ typedef struct
 
 typedef struct
 {
-  uint32_t     idcode;
   char         *name;
+  char         *description;
   target_ops_t *ops;
 } target_t;
 
 /*- Prototypes --------------------------------------------------------------*/
-target_t *target_identify(void);
+void target_list(void);
+target_t *target_get_ops(char *name);
 
 #endif // _TARGET_H_
 

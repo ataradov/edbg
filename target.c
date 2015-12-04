@@ -28,6 +28,7 @@
 
 /*- Includes ----------------------------------------------------------------*/
 #include <stdio.h>
+#include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include "target.h"
@@ -35,37 +36,39 @@
 #include "dap.h"
 
 /*- Variables ---------------------------------------------------------------*/
-extern target_ops_t target_cm0p_ops;
-extern target_ops_t target_cm4_ops;
-extern target_ops_t target_cm7_ops;
+extern target_ops_t target_atmel_cm0p_ops;
+extern target_ops_t target_atmel_cm4_ops;
+extern target_ops_t target_atmel_cm7_ops;
 
 static target_t targets[] =
 {
-  { 0x0bc11477, "Cortex-M0+",		&target_cm0p_ops },
-  { 0x2ba01477, "Cortex-M4",		&target_cm4_ops },
-  { 0x0bd11477, "Cortex-M7",		&target_cm7_ops },
-  { 0, "", NULL },
+  { "atmel_cm0p",	"Atmel SAM C/D/R series",	&target_atmel_cm0p_ops },
+  { "atmel_cm4",	"Atmel SAM G and SAM4 series",	&target_atmel_cm4_ops },
+  { "atmel_cm7",	"Atmel SAM E7x/S7x/V7x series",	&target_atmel_cm7_ops },
+  { NULL, NULL, NULL },
 };
 
 /*- Implementations ---------------------------------------------------------*/
 
 //-----------------------------------------------------------------------------
-target_t *target_identify(void)
+void target_list(void)
 {
-  uint32_t idcode;
+  printf("Supported target types:\n");
 
-  idcode = dap_read_idcode();
+  for (target_t *target = targets; NULL != target->name; target++)
+    printf("  %-16s - %s\n", target->name, target->description);
+}
 
-  for (target_t *target = targets; target->idcode > 0; target++)
+//-----------------------------------------------------------------------------
+target_t *target_get_ops(char *name)
+{
+  for (target_t *target = targets; NULL != target->name; target++)
   {
-    if (target->idcode == idcode)
-    {
-      verbose("Target type: %s\n", target->name);
+    if (0 == strcmp(target->name, name))
       return target;
-    }
   }
 
-  error_exit("unknown target type (IDCODE = 0x%08x)", idcode);
+  error_exit("unknown target type (%s); use '-t' option", name);
 
   return NULL;
 }

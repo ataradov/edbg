@@ -34,8 +34,6 @@
 #include <stdbool.h>
 
 /*- Definitions -------------------------------------------------------------*/
-#define DBG_VID      0x03eb
-#define DBG_PID      0x2111
 
 /*- Types -------------------------------------------------------------------*/
 typedef struct
@@ -45,12 +43,15 @@ typedef struct
   wchar_t  *wserial;
   char     *manufacturer;
   char     *product;
+  int      vid;
+  int      pid;
 } debugger_t;
 
 /*- Prototypes --------------------------------------------------------------*/
 int dbg_enumerate(debugger_t *debuggers, int size);
 void dbg_open(debugger_t *debugger);
 void dbg_close(void);
+int dbg_get_report_size(void);
 int dbg_dap_cmd(uint8_t *data, int size, int rsize);
 
 #endif // _DBG_H_

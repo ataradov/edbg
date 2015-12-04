@@ -36,8 +36,6 @@
 #include "dap.h"
 
 /*- Definitions -------------------------------------------------------------*/
-#define SECTOR_SIZE            256
-
 #define DHCSR                  0xe000edf0
 #define DEMCR                  0xe000edfc
 #define AIRCR                  0xe000ed0c
@@ -135,7 +133,7 @@ static device_t *device;
 /*- Implementations ---------------------------------------------------------*/
 
 //-----------------------------------------------------------------------------
-static void target_cm4_select(void)
+static void target_select(void)
 {
   uint32_t chip_id, chip_exid;
 
@@ -189,7 +187,7 @@ static void target_cm4_select(void)
 }
 
 //-----------------------------------------------------------------------------
-static void target_cm4_deselect(void)
+static void target_deselect(void)
 {
   dap_write_word(DHCSR, 0xa05f0000);
   dap_write_word(DEMCR, 0x00000000);
@@ -197,7 +195,7 @@ static void target_cm4_deselect(void)
 }
 
 //-----------------------------------------------------------------------------
-static void target_cm4_erase(void)
+static void target_erase(void)
 {
   verbose("Erasing... ");
 
@@ -211,7 +209,7 @@ static void target_cm4_erase(void)
 }
 
 //-----------------------------------------------------------------------------
-static void target_cm4_lock(void)
+static void target_lock(void)
 {
   verbose("Locking... ");
 
@@ -222,7 +220,7 @@ static void target_cm4_lock(void)
 }
 
 //-----------------------------------------------------------------------------
-static void target_cm4_program(char *name)
+static void target_program(char *name)
 {
   uint32_t addr = device->flash_start;
   uint32_t flash_size = device->flash_size * device->n_planes;
@@ -254,12 +252,9 @@ static void target_cm4_program(char *name)
 
   for (uint32_t page = 0; page < number_of_pages; page++)
   {
-    for (uint32_t sector = 0; sector < device->page_size / SECTOR_SIZE; sector++)
-    {
-      dap_write_block(addr, &buf[offs], SECTOR_SIZE);
-      addr += SECTOR_SIZE;
-      offs += SECTOR_SIZE;
-    }
+    dap_write_block(addr, &buf[offs], device->page_size);
+    addr += device->page_size;
+    offs += device->page_size;
 
     plane = page / (device->flash_size / device->page_size);
 
@@ -275,7 +270,7 @@ static void target_cm4_program(char *name)
 }
 
 //-----------------------------------------------------------------------------
-static void target_cm4_verify(char *name)
+static void target_verify(char *name)
 {
   uint32_t addr = device->flash_start;
   uint32_t flash_size = device->flash_size * device->n_planes;
@@ -284,7 +279,7 @@ static void target_cm4_verify(char *name)
   uint8_t *bufa, *bufb;
 
   bufa = buf_alloc(flash_size);
-  bufb = buf_alloc(SECTOR_SIZE);
+  bufb = buf_alloc(device->page_size);
 
   size = load_file(name, bufa, flash_size);
 
@@ -292,9 +287,9 @@ static void target_cm4_verify(char *name)
 
   while (size)
   {
-    dap_read_block(addr, bufb, SECTOR_SIZE);
+    dap_read_block(addr, bufb, device->page_size);
 
-    block_size = (size > SECTOR_SIZE) ? SECTOR_SIZE : size;
+    block_size = (size > device->page_size) ? device->page_size : size;
 
     for (int i = 0; i < (int)block_size; i++)
     {
@@ -308,8 +303,8 @@ static void target_cm4_verify(char *name)
       }
     }
 
-    addr += SECTOR_SIZE;
-    offs += SECTOR_SIZE;
+    addr += device->page_size;
+    offs += device->page_size;
     size -= block_size;
 
     verbose(".");
@@ -322,7 +317,7 @@ static void target_cm4_verify(char *name)
 }
 
 //-----------------------------------------------------------------------------
-static void target_cm4_read(char *name)
+static void target_read(char *name)
 {
   uint32_t flash_size = device->flash_size * device->n_planes;
   uint32_t size = flash_size;
@@ -336,13 +331,11 @@ static void target_cm4_read(char *name)
 
   while (size)
   {
-    for (uint32_t sector = 0; sector < device->page_size / SECTOR_SIZE; sector++)
-    {
-      dap_read_block(addr, &buf[offs], SECTOR_SIZE);
-      addr += SECTOR_SIZE;
-      offs += SECTOR_SIZE;
-      size -= SECTOR_SIZE;
-    }
+    dap_read_block(addr, &buf[offs], device->page_size);
+
+    addr += device->page_size;
+    offs += device->page_size;
+    size -= device->page_size;
 
     verbose(".");
   }
@@ -355,14 +348,14 @@ static void target_cm4_read(char *name)
 }
 
 //-----------------------------------------------------------------------------
-target_ops_t target_cm4_ops = 
+target_ops_t target_atmel_cm4_ops = 
 {
-  .select   = target_cm4_select,
-  .deselect = target_cm4_deselect,
-  .erase    = target_cm4_erase,
-  .lock     = target_cm4_lock,
-  .program  = target_cm4_program,
-  .verify   = target_cm4_verify,
-  .read     = target_cm4_read,
+  .select   = target_select,
+  .deselect = target_deselect,
+  .erase    = target_erase,
+  .lock     = target_lock,
+  .program  = target_program,
+  .verify   = target_verify,
+  .read     = target_read,
 };
 
