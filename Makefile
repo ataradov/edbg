@@ -5,6 +5,7 @@ SRCS = \
   edbg.c \
   target.c \
   target_atmel_cm0p.c \
+  target_atmel_cm3.c \
   target_atmel_cm4.c \
   target_atmel_cm7.c
 
@@ -37,7 +38,7 @@ endif
 CFLAGS += -W -Wall -O2 -std=gnu99
 
 all: $(BIN)
-	
+
 $(BIN): $(SRCS) $(HDRS) $(HIDAPI)
 	gcc $(CFLAGS) $(SRCS) $(LIBS) -o $(BIN)
 

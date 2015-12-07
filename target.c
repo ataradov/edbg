@@ -37,12 +37,14 @@
 
 /*- Variables ---------------------------------------------------------------*/
 extern target_ops_t target_atmel_cm0p_ops;
+extern target_ops_t target_atmel_cm3_ops;
 extern target_ops_t target_atmel_cm4_ops;
 extern target_ops_t target_atmel_cm7_ops;
 
 static target_t targets[] =
 {
   { "atmel_cm0p",	"Atmel SAM C/D/R series",	&target_atmel_cm0p_ops },
+  { "atmel_cm3",	"Atmel SAM3X/A series",	&target_atmel_cm3_ops },
   { "atmel_cm4",	"Atmel SAM G and SAM4 series",	&target_atmel_cm4_ops },
   { "atmel_cm7",	"Atmel SAM E7x/S7x/V7x series",	&target_atmel_cm7_ops },
   { NULL, NULL, NULL },
