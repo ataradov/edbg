@@ -224,9 +224,9 @@ static void print_help(char *name)
   printf("  -p, --program              program the chip\n");
   printf("  -v, --verify               verify memory\n");
   printf("  -k, --lock                 lock the chip (set security bit)\n");
-  printf("  -r, --read                 read the contents of the chip\n");
+  printf("  -r, --read                 read the whole content of the chip flash\n");
   printf("  -f, --file <file>          binary file to be programmed or verified\n");
-  printf("  -t, --target <name>        specify a traget type (use '-t list' for a list of supported target types\n");
+  printf("  -t, --target <name>        specify a target type (use '-t list' for a list of supported target types)\n");
   printf("  -l, --list                 list all available debuggers\n");
   printf("  -s, --serial <number>      use a debugger with a specified serial number\n");
   printf("  -b, --verbose              print verbose messages\n");
