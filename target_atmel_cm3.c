@@ -37,53 +37,50 @@
 #include "dap.h"
 
 /*- Definitions -------------------------------------------------------------*/
-#define DHCSR                  0xe000edf0
-#define DEMCR                  0xe000edfc
-#define AIRCR                  0xe000ed0c
+#define ARM_DAP_DHCSR          0xe000edf0
+#define ARM_DAP_DEMCR          0xe000edfc
+#define ARM_SCB_AIRCR          0xe000ed0c
 
 #define CHIPID_CIDR            0x400E0940
 #define CHIPID_EXID            0x400E0944
 
 /*
+#define SAM3S_EEFC_BASE        0x400E0A00
+#define SAM3S8_EEFC_BASE       0x400E0A00
+#define SAM3SD8_EEFC_BASE      0x400E0A00
+#define SAM3N_EEFC_BASE        0x400E0A00
+
 #define SAM3XA_EEFC0_BASE      0x400E0A00
 #define SAM3XA_EEFC1_BASE      0x400E0C00
+
+#define SAM3U_EEFC0_BASE       0x400E0800
+#define SAM3U_EEFC1_BASE       0x400E0A00
 */
 
-/*
-0x00 EEFC Flash Mode Register      EEFC_FMR   Read-write   0x0
-0x04 EEFC Flash Command Register   EEFC_FCR   Write-only   –
-0x08 EEFC Flash Status Register    EEFC_FSR   Read-only    0x00000001
-0x0C EEFC Flash Result Register    EEFC_FRR   Read-only    0x0
-*/
-#define EEFC_FMR(n)            (0x400e0a00 + (n) * 0x200)
-#define EEFC_FCR(n)            (0x400e0a04 + (n) * 0x200)
-#define EEFC_FSR(n)            (0x400e0a08 + (n) * 0x200)
-#define EEFC_FRR(n)            (0x400e0a0c + (n) * 0x200)
+#define EEFC_BASE              (0x400E0A00) // not the case for SAM3U
+#define EEFC_FMR(n)            (EEFC_BASE + 0x00 + (n) * 0x200) // EEFC Flash Mode Register      Read-write
+#define EEFC_FCR(n)            (EEFC_BASE + 0x04 + (n) * 0x200) // EEFC Flash Command Register   Write-only
+#define EEFC_FSR(n)            (EEFC_BASE + 0x08 + (n) * 0x200) // EEFC Flash Status Register    Read-only
+#define EEFC_FRR(n)            (EEFC_BASE + 0x0c + (n) * 0x200) // EEFC Flash Result Register    Read-only
 #define FSR_FRDY               (1ul)
 
-/*
-Get Flash Descriptor                  0x00   GETD
-Write page                            0x01   WP
-Write page and lock                   0x02   WPL
-Erase page and write page             0x03   EWP
-Erase page and write page then lock   0x04   EWPL
-Erase all                             0x05   EA
-Set Lock Bit                          0x08   SLB
-Clear Lock Bit                        0x09   CLB
-Get Lock Bit                          0x0A   GLB
-Set GPNVM Bit                         0x0B   SGPB
-Clear GPNVM Bit                       0x0C   CGPB
-Get GPNVM Bit                         0x0D   GGPB
-Start Read Unique Identifier          0x0E   STUI
-Stop Read Unique Identifier           0x0F   SPUI
-Get CALIB Bit                         0x10   GCALB
-*/
-
-#define CMD_GETD               0x5a000000
-#define CMD_WP                 0x5a000001
-#define CMD_EA                 0x5a000005
-#define CMD_EWP                0x5a000003
-#define CMD_SGPB               0x5a00000b
+enum {
+CMD_GETD  = 0x5a000000, // Get Flash Descriptor
+CMD_WP    = 0x5a000001, // Write page
+CMD_WPL   = 0x5a000002, // Write page and lock
+CMD_EWP   = 0x5a000003, // Erase page and write page
+CMD_EWPL  = 0x5a000004, // Erase page and write page then lock
+CMD_EA    = 0x5a000005, // Erase all
+CMD_SLB   = 0x5a000008, // Set Lock Bit
+CMD_CLB   = 0x5a000009, // Clear Lock Bit
+CMD_GLB   = 0x5a00000A, // Get Lock Bit
+CMD_SGPB  = 0x5a00000B, // Set GPNVM Bit
+CMD_CGPB  = 0x5a00000C, // Clear GPNVM Bit
+CMD_GGPB  = 0x5a00000D, // Get GPNVM Bit
+CMD_STUI  = 0x5a00000E, // Start Read Unique Identifier
+CMD_SPUI  = 0x5a00000F, // Stop Read Unique Identifier
+CMD_GCALB = 0x5a000010  // Get CALIB Bit
+};
 
 /*- Types -------------------------------------------------------------------*/
 typedef struct
@@ -123,9 +120,9 @@ static void target_select(void)
   dap_write_word(EEFC_FCR(0), CMD_SGPB | (1 << 8));
 
   // Stop the core
-  dap_write_word(DHCSR, 0xa05f0003);
-  dap_write_word(DEMCR, 0x00000001);
-  dap_write_word(AIRCR, 0x05fa0004);
+  dap_write_word(ARM_DAP_DHCSR, 0xa05f0003);
+  dap_write_word(ARM_DAP_DEMCR, 0x00000001);
+  dap_write_word(ARM_SCB_AIRCR, 0x05fa0004);
 
   chip_id = dap_read_word(CHIPID_CIDR);
   chip_exid = dap_read_word(CHIPID_EXID);
@@ -171,9 +168,9 @@ static void target_select(void)
 //-----------------------------------------------------------------------------
 static void target_deselect(void)
 {
-  dap_write_word(DHCSR, 0xa05f0000);
-  dap_write_word(DEMCR, 0x00000000);
-  dap_write_word(AIRCR, 0x05fa0004);
+  dap_write_word(ARM_DAP_DHCSR, 0xa05f0000);
+  dap_write_word(ARM_DAP_DEMCR, 0x00000000);
+  dap_write_word(ARM_SCB_AIRCR, 0x05fa0004);
 }
 
 //-----------------------------------------------------------------------------
