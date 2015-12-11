@@ -44,43 +44,28 @@
 #define CHIPID_CIDR            0x400E0940
 #define CHIPID_EXID            0x400E0944
 
-/*
-#define SAM3S_EEFC_BASE        0x400E0A00
-#define SAM3S8_EEFC_BASE       0x400E0A00
-#define SAM3SD8_EEFC_BASE      0x400E0A00
-#define SAM3N_EEFC_BASE        0x400E0A00
-
-#define SAM3XA_EEFC0_BASE      0x400E0A00
-#define SAM3XA_EEFC1_BASE      0x400E0C00
-
-#define SAM3U_EEFC0_BASE       0x400E0800
-#define SAM3U_EEFC1_BASE       0x400E0A00
-*/
-
-#define EEFC_BASE              (0x400E0A00) // not the case for SAM3U
+#define EEFC_BASE              (0x400E0A00) // be aware this is not the case for SAM3U!!!
 #define EEFC_FMR(n)            (EEFC_BASE + 0x00 + (n) * 0x200) // EEFC Flash Mode Register      Read-write
 #define EEFC_FCR(n)            (EEFC_BASE + 0x04 + (n) * 0x200) // EEFC Flash Command Register   Write-only
 #define EEFC_FSR(n)            (EEFC_BASE + 0x08 + (n) * 0x200) // EEFC Flash Status Register    Read-only
 #define EEFC_FRR(n)            (EEFC_BASE + 0x0c + (n) * 0x200) // EEFC Flash Result Register    Read-only
 #define FSR_FRDY               (1ul)
 
-enum {
-CMD_GETD  = 0x5a000000, // Get Flash Descriptor
-CMD_WP    = 0x5a000001, // Write page
-CMD_WPL   = 0x5a000002, // Write page and lock
-CMD_EWP   = 0x5a000003, // Erase page and write page
-CMD_EWPL  = 0x5a000004, // Erase page and write page then lock
-CMD_EA    = 0x5a000005, // Erase all
-CMD_SLB   = 0x5a000008, // Set Lock Bit
-CMD_CLB   = 0x5a000009, // Clear Lock Bit
-CMD_GLB   = 0x5a00000A, // Get Lock Bit
-CMD_SGPB  = 0x5a00000B, // Set GPNVM Bit
-CMD_CGPB  = 0x5a00000C, // Clear GPNVM Bit
-CMD_GGPB  = 0x5a00000D, // Get GPNVM Bit
-CMD_STUI  = 0x5a00000E, // Start Read Unique Identifier
-CMD_SPUI  = 0x5a00000F, // Stop Read Unique Identifier
-CMD_GCALB = 0x5a000010  // Get CALIB Bit
-};
+#define CMD_GETD               0x5a000000 // Get Flash Descriptor
+#define CMD_WP                 0x5a000001 // Write page
+#define CMD_WPL                0x5a000002 // Write page and lock
+#define CMD_EWP                0x5a000003 // Erase page and write page
+#define CMD_EWPL               0x5a000004 // Erase page and write page then lock
+#define CMD_EA                 0x5a000005 // Erase all
+#define CMD_SLB                0x5a000008 // Set Lock Bit
+#define CMD_CLB                0x5a000009 // Clear Lock Bit
+#define CMD_GLB                0x5a00000A // Get Lock Bit
+#define CMD_SGPB               0x5a00000B // Set GPNVM Bit
+#define CMD_CGPB               0x5a00000C // Clear GPNVM Bit
+#define CMD_GGPB               0x5a00000D // Get GPNVM Bit
+#define CMD_STUI               0x5a00000E // Start Read Unique Identifier
+#define CMD_SPUI               0x5a00000F // Stop Read Unique Identifier
+#define CMD_GCALB              0x5a000010 // Get CALIB Bit
 
 /*- Types -------------------------------------------------------------------*/
 typedef struct
@@ -216,19 +201,6 @@ static void target_program(char *name)
   verbose("Programming...");
 
   number_of_pages = (size + device->page_size - 1) / device->page_size;
-
-/*
-  for (uint32_t page = 0; page < number_of_pages; page += 8)
-  {
-    plane = page / (device->flash_size / device->page_size);
-
-    dap_write_word(EEFC_FCR(plane), CMD_EPA | ((page | 1) << 8));
-    while (0 == (dap_read_word(EEFC_FSR(plane)) & FSR_FRDY));
-
-    verbose(".");
-  }
-  verbose(",");
-*/
 
   for (uint32_t page = 0; page < number_of_pages; page++)
   {
