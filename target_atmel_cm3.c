@@ -52,7 +52,6 @@
 #define FSR_FRDY               (1ul)
 
 #define CMD_GETD               0x5a000000 // Get Flash Descriptor
-#define CMD_WP                 0x5a000001 // Write page
 #define CMD_EWP                0x5a000003 // Erase page and write page
 #define CMD_EA                 0x5a000005 // Erase all
 #define CMD_SGPB               0x5a00000B // Set GPNVM Bit
