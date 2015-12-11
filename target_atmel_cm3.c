@@ -53,19 +53,9 @@
 
 #define CMD_GETD               0x5a000000 // Get Flash Descriptor
 #define CMD_WP                 0x5a000001 // Write page
-#define CMD_WPL                0x5a000002 // Write page and lock
 #define CMD_EWP                0x5a000003 // Erase page and write page
-#define CMD_EWPL               0x5a000004 // Erase page and write page then lock
 #define CMD_EA                 0x5a000005 // Erase all
-#define CMD_SLB                0x5a000008 // Set Lock Bit
-#define CMD_CLB                0x5a000009 // Clear Lock Bit
-#define CMD_GLB                0x5a00000A // Get Lock Bit
 #define CMD_SGPB               0x5a00000B // Set GPNVM Bit
-#define CMD_CGPB               0x5a00000C // Clear GPNVM Bit
-#define CMD_GGPB               0x5a00000D // Get GPNVM Bit
-#define CMD_STUI               0x5a00000E // Start Read Unique Identifier
-#define CMD_SPUI               0x5a00000F // Stop Read Unique Identifier
-#define CMD_GCALB              0x5a000010 // Get CALIB Bit
 
 /*- Types -------------------------------------------------------------------*/
 typedef struct
