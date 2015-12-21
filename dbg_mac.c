@@ -40,6 +40,7 @@
 /*- Variables ---------------------------------------------------------------*/
 static hid_device *handle = NULL;
 static uint8_t hid_buffer[1024 + 1];
+static int report_size = 512; // TODO: read actual report size
 
 /*- Implementations ---------------------------------------------------------*/
 
@@ -108,8 +109,7 @@ void dbg_close(void)
 //-----------------------------------------------------------------------------
 int dbg_get_report_size(void)
 {
-  // TODO: implement
-  return 512;
+  return report_size;
 }
 
 //-----------------------------------------------------------------------------
