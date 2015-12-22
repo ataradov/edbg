@@ -229,6 +229,9 @@ static void target_program(char *name)
 
   buf_free(buf);
 
+  // Set boot mode GPNVM bit
+  dap_write_word(EEFC_FCR, CMD_SGPB | (1 << 8));
+
   verbose(" done.\n");
 }
 
