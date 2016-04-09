@@ -75,7 +75,9 @@ int dbg_enumerate(debugger_t *debuggers, int size)
     dev = udev_device_new_from_syspath(udev, path);
 
     parent = udev_device_get_parent_with_subsystem_devtype(dev, "usb", "usb_device");
-    check(parent, "unable to find parent usb device");
+
+    if (NULL == parent)
+      continue;
 
     if (rsize < size)
     {
