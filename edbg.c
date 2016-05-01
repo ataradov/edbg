@@ -68,11 +68,12 @@ static const struct option long_options[] =
   { "target",    required_argument,  0, 't' },
   { "list",      no_argument,        0, 'l' },
   { "serial",    required_argument,  0, 's' },
+  { "offset",    required_argument,  0, 'o' },
   { "verbose",   no_argument,        0, 'b' },
   { 0, 0, 0, 0 }
 };
 
-static const char *short_options = "hepvkrf:t:ls:b";
+static const char *short_options = "hepvkrf:t:ls:o:b";
 
 static bool g_erase = false;
 static bool g_program = false;
@@ -84,6 +85,7 @@ static char *g_serial = NULL;
 static bool g_list = false;
 static char *g_target = NULL;
 static bool g_verbose = false;
+static uint32_t g_offset = 0;
 
 /*- Implementations ---------------------------------------------------------*/
 
@@ -229,6 +231,7 @@ static void print_help(char *name)
   printf("  -t, --target <name>        specify a target type (use '-t list' for a list of supported target types)\n");
   printf("  -l, --list                 list all available debuggers\n");
   printf("  -s, --serial <number>      use a debugger with a specified serial number\n");
+  printf("  -o, --offset <number>      offset in memory at which to start programming\n");
   printf("  -b, --verbose              print verbose messages\n");
   exit(0);
 }
@@ -254,6 +257,7 @@ static void parse_command_line(int argc, char **argv)
       case 'l': g_list = true; break;
       case 's': g_serial = optarg; break;
       case 'b': g_verbose = true; break;
+      case 'o': g_offset = (uint32_t)strtoul(optarg, NULL, 0); break;
       default: exit(1); break;
     }
   }
@@ -338,10 +342,10 @@ int main(int argc, char **argv)
     target->ops->erase();
 
   if (g_program)
-    target->ops->program(g_file);
+    target->ops->program(g_file, g_offset);
 
   if (g_verify)
-    target->ops->verify(g_file);
+    target->ops->verify(g_file, g_offset);
 
   if (g_lock)
     target->ops->lock();

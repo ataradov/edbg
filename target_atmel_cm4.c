@@ -220,9 +220,9 @@ static void target_lock(void)
 }
 
 //-----------------------------------------------------------------------------
-static void target_program(char *name)
+static void target_program(char *name, uint32_t offset)
 {
-  uint32_t addr = device->flash_start;
+  uint32_t addr = device->flash_start + offset;
   uint32_t flash_size = device->flash_size * device->n_planes;
   uint32_t size, number_of_pages, plane;
   uint32_t offs = 0;
@@ -234,7 +234,7 @@ static void target_program(char *name)
 
   memset(&buf[size], 0xff, flash_size - size);
 
-  verbose("Programming...");
+  verbose("Programming (offset 0x%X)...", offset);
 
   number_of_pages = (size + device->page_size - 1) / device->page_size;
 
@@ -270,9 +270,9 @@ static void target_program(char *name)
 }
 
 //-----------------------------------------------------------------------------
-static void target_verify(char *name)
+static void target_verify(char *name, uint32_t offset)
 {
-  uint32_t addr = device->flash_start;
+  uint32_t addr = device->flash_start + offset;
   uint32_t flash_size = device->flash_size * device->n_planes;
   uint32_t size, block_size;
   uint32_t offs = 0;
@@ -283,7 +283,7 @@ static void target_verify(char *name)
 
   size = load_file(name, bufa, flash_size);
 
-  verbose("Verification...");
+  verbose("Verification (offset 0x%X)...", offset);
 
   while (size)
   {
