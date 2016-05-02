@@ -147,9 +147,11 @@ static void target_program(char *name, uint32_t offset)
   if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
     error_exit("devices is locked, perform a chip erase before programming");
 
+  check_offset(device->row_size, device->flash_size, offset);
+
   buf = buf_alloc(device->flash_size);
 
-  size = load_file(name, buf, device->flash_size);
+  size = load_file(name, buf, device->flash_size - offset);
 
   memset(&buf[size], 0xff, device->flash_size - size);
 
@@ -193,10 +195,12 @@ static void target_verify(char *name, uint32_t offset)
   if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
     error_exit("devices is locked, unable to verify");
 
+  check_offset(device->row_size, device->flash_size, offset);
+
   bufa = buf_alloc(device->flash_size);
   bufb = buf_alloc(device->row_size);
 
-  size = load_file(name, bufa, device->flash_size);
+  size = load_file(name, bufa, device->flash_size - offset);
 
   verbose("Verification (offset 0x%X)...", offset);
 

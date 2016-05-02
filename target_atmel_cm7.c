@@ -195,9 +195,11 @@ static void target_program(char *name, uint32_t offset)
   uint32_t offs = 0;
   uint8_t *buf;
 
+  check_offset(device->page_size, device->flash_size, offset);
+
   buf = buf_alloc(device->flash_size);
 
-  size = load_file(name, buf, device->flash_size);
+  size = load_file(name, buf, device->flash_size - offset);
 
   memset(&buf[size], 0xff, device->flash_size - size);
 
@@ -243,10 +245,12 @@ static void target_verify(char *name, uint32_t offset)
   uint32_t offs = 0;
   uint8_t *bufa, *bufb;
 
+  check_offset(device->page_size, device->flash_size, offset);
+
   bufa = buf_alloc(device->flash_size);
   bufb = buf_alloc(device->page_size);
 
-  size = load_file(name, bufa, device->flash_size);
+  size = load_file(name, bufa, device->flash_size - offset);
 
   verbose("Verification (offset 0x%X)...", offset);
 
