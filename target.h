@@ -36,13 +36,29 @@
 /*- Types -------------------------------------------------------------------*/
 typedef struct
 {
-  void (*select)(void);
+  bool         erase;
+  bool         program;
+  bool         verify;
+  bool         lock;
+  bool         read;
+  char         *name;
+  int32_t      offset;
+  int32_t      size;
+
+  // For target use only
+  int          file_size;
+  uint8_t      *file_data;
+} target_options_t;
+
+typedef struct
+{
+  void (*select)(target_options_t *options);
   void (*deselect)(void);
   void (*erase)(void);
   void (*lock)(void);
-  void (*program)(char *name, uint32_t offset);
-  void (*verify)(char *name, uint32_t offset);
-  void (*read)(char *name);
+  void (*program)(void);
+  void (*verify)(void);
+  void (*read)(void);
 } target_ops_t;
 
 typedef struct
@@ -55,6 +71,8 @@ typedef struct
 /*- Prototypes --------------------------------------------------------------*/
 void target_list(void);
 target_t *target_get_ops(char *name);
+void target_check_options(target_options_t *options, int size, int align);
+void target_free_options(target_options_t *options);
 
 #endif // _TARGET_H_
 

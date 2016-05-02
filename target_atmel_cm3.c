@@ -41,10 +41,10 @@
 #define ARM_DAP_DEMCR          0xe000edfc
 #define ARM_SCB_AIRCR          0xe000ed0c
 
-#define CHIPID_CIDR            0x400E0940
-#define CHIPID_EXID            0x400E0944
+#define CHIPID_CIDR            0x400e0940
+#define CHIPID_EXID            0x400e0944
 
-#define EEFC_BASE              (0x400E0A00) // be aware this is not the case for SAM3U!!!
+#define EEFC_BASE              (0x400e0a00) // be aware this is not the case for SAM3U!!!
 #define EEFC_FMR(n)            (EEFC_BASE + 0x00 + (n) * 0x200) // EEFC Flash Mode Register      Read-write
 #define EEFC_FCR(n)            (EEFC_BASE + 0x04 + (n) * 0x200) // EEFC Flash Command Register   Write-only
 #define EEFC_FSR(n)            (EEFC_BASE + 0x08 + (n) * 0x200) // EEFC Flash Status Register    Read-only
@@ -54,7 +54,7 @@
 #define CMD_GETD               0x5a000000 // Get Flash Descriptor
 #define CMD_EWP                0x5a000003 // Erase page and write page
 #define CMD_EA                 0x5a000005 // Erase all
-#define CMD_SGPB               0x5a00000B // Set GPNVM Bit
+#define CMD_SGPB               0x5a00000b // Set GPNVM Bit
 
 /*- Types -------------------------------------------------------------------*/
 typedef struct
@@ -81,12 +81,13 @@ static device_t devices[] =
   { 0, 0, "", 0, 0, 0, 0 },
 };
 
-static device_t *device;
+static device_t target_device;
+static target_options_t target_options;
 
 /*- Implementations ---------------------------------------------------------*/
 
 //-----------------------------------------------------------------------------
-static void target_select(void)
+static void target_select(target_options_t *options)
 {
   uint32_t chip_id, chip_exid;
 
@@ -101,7 +102,7 @@ static void target_select(void)
   chip_id = dap_read_word(CHIPID_CIDR);
   chip_exid = dap_read_word(CHIPID_EXID);
 
-  for (device = devices; device->chip_id > 0; device++)
+  for (device_t *device = devices; device->chip_id > 0; device++)
   {
     if (device->chip_id == chip_id && device->chip_exid == chip_exid)
     {
@@ -132,6 +133,12 @@ static void target_select(void)
           dap_read_word(EEFC_FRR(plane));
       }
 
+      target_device = *device;
+      target_options = *options;
+
+      target_check_options(&target_options, device->flash_size * target_device.n_planes,
+          device->page_size);
+
       return;
     }
   }
@@ -145,96 +152,70 @@ static void target_deselect(void)
   dap_write_word(ARM_DAP_DHCSR, 0xa05f0000);
   dap_write_word(ARM_DAP_DEMCR, 0x00000000);
   dap_write_word(ARM_SCB_AIRCR, 0x05fa0004);
+
+  target_free_options(&target_options);
 }
 
 //-----------------------------------------------------------------------------
 static void target_erase(void)
 {
-  verbose("Erasing... ");
-
-  for (uint32_t plane = 0; plane < device->n_planes; plane++)
+  for (uint32_t plane = 0; plane < target_device.n_planes; plane++)
     dap_write_word(EEFC_FCR(plane), CMD_EA);
 
-  for (uint32_t plane = 0; plane < device->n_planes; plane++)
+  for (uint32_t plane = 0; plane < target_device.n_planes; plane++)
     while (0 == (dap_read_word(EEFC_FSR(plane)) & FSR_FRDY));
-
-  verbose("done.\n");
 }
 
 //-----------------------------------------------------------------------------
 static void target_lock(void)
 {
-  verbose("Locking... ");
-
   // It is enough to lock just one plane to lock the entire device
   dap_write_word(EEFC_FCR(0), CMD_SGPB | (0 << 8));
-
-  verbose("done.\n");
 }
 
 //-----------------------------------------------------------------------------
-static void target_program(char *name, uint32_t offset)
+static void target_program(void)
 {
-  uint32_t addr = device->flash_start + offset;
-  uint32_t flash_size = device->flash_size * device->n_planes;
-  uint32_t size, number_of_pages, plane;
+  uint32_t addr = target_device.flash_start + target_options.offset;
+  uint32_t number_of_pages, plane;
   uint32_t offs = 0;
-  uint8_t *buf;
+  uint8_t *buf = target_options.file_data;
+  uint32_t size = target_options.file_size;
 
-  buf = buf_alloc(flash_size);
-
-  size = load_file(name, buf, flash_size - offset);
-
-  check_offset(device->page_size, device->flash_size, size, offset);
-
-  memset(&buf[size], 0xff, flash_size - size);
-
-  verbose("Programming (offset 0x%X)...", offset);
-
-  number_of_pages = (size + device->page_size - 1) / device->page_size;
+  number_of_pages = (size + target_device.page_size - 1) / target_device.page_size;
 
   for (uint32_t page = 0; page < number_of_pages; page++)
   {
-    dap_write_block(addr, &buf[offs], device->page_size);
-    addr += device->page_size;
-    offs += device->page_size;
+    dap_write_block(addr, &buf[offs], target_device.page_size);
+    addr += target_device.page_size;
+    offs += target_device.page_size;
 
-    plane = page / (device->flash_size / device->page_size);
+    plane = page / (target_device.flash_size / target_device.page_size);
 
     dap_write_word(EEFC_FCR(plane), CMD_EWP | (page << 8));
     while (0 == (dap_read_word(EEFC_FSR(plane)) & FSR_FRDY));
 
     verbose(".");
   }
-
-  buf_free(buf);
-
-  verbose(" done.\n");
 }
 
 //-----------------------------------------------------------------------------
-static void target_verify(char *name, uint32_t offset)
+static void target_verify(void)
 {
-  uint32_t addr = device->flash_start + offset;
-  uint32_t flash_size = device->flash_size * device->n_planes;
-  uint32_t size, block_size;
+  uint32_t addr = target_device.flash_start + target_options.offset;
+  uint32_t block_size;
   uint32_t offs = 0;
-  uint8_t *bufa, *bufb;
+  uint8_t *bufb;
+  uint8_t *bufa = target_options.file_data;
+  uint32_t size = target_options.file_size;
 
-  bufa = buf_alloc(flash_size);
-  bufb = buf_alloc(device->page_size);
-
-  size = load_file(name, bufa, flash_size - offset);
-
-  check_offset(device->page_size, device->flash_size, size, offset);
-
-  verbose("Verification (offset 0x%X)...", offset);
+  bufb = buf_alloc(target_device.page_size);
 
   while (size)
   {
-    dap_read_block(addr, bufb, device->page_size);
+    dap_read_block(addr, bufb, target_device.page_size);
 
-    block_size = (size > device->page_size) ? device->page_size : size;
+    block_size = (size > target_device.page_size) ? target_device.page_size : size;
 
     for (int i = 0; i < (int)block_size; i++)
     {
@@ -242,54 +223,41 @@ static void target_verify(char *name, uint32_t offset)
       {
         verbose("\nat address 0x%x expected 0x%02x, read 0x%02x\n",
             addr + i, bufa[offs + i], bufb[i]);
-        free(bufa);
-        free(bufb);
+        buf_free(bufb);
         error_exit("verification failed");
       }
     }
 
-    addr += device->page_size;
-    offs += device->page_size;
+    addr += target_device.page_size;
+    offs += target_device.page_size;
     size -= block_size;
 
     verbose(".");
   }
 
-  free(bufa);
-  free(bufb);
-
-  verbose(" done.\n");
+  buf_free(bufb);
 }
 
 //-----------------------------------------------------------------------------
-static void target_read(char *name)
+static void target_read(void)
 {
-  uint32_t flash_size = device->flash_size * device->n_planes;
-  uint32_t size = flash_size;
-  uint32_t addr = device->flash_start;
+  uint32_t addr = target_device.flash_start + target_options.offset;
   uint32_t offs = 0;
-  uint8_t *buf;
-
-  buf = buf_alloc(flash_size);
-
-  verbose("Reading...");
+  uint8_t *buf = target_options.file_data;
+  uint32_t size = target_options.size;
 
   while (size)
   {
-    dap_read_block(addr, &buf[offs], device->page_size);
+    dap_read_block(addr, &buf[offs], target_device.page_size);
 
-    addr += device->page_size;
-    offs += device->page_size;
-    size -= device->page_size;
+    addr += target_device.page_size;
+    offs += target_device.page_size;
+    size -= target_device.page_size;
 
     verbose(".");
   }
 
-  save_file(name, buf, flash_size);
-
-  buf_free(buf);
-
-  verbose(" done.\n");
+  save_file(target_options.name, buf, target_options.size);
 }
 
 //-----------------------------------------------------------------------------

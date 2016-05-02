@@ -23,6 +23,7 @@ you will need:
 Usage: edbg [options]
 Options:
   -h, --help                 print this help message and exit
+  -b, --verbose              print verbose messages
   -e, --erase                perform a chip erase before programming
   -p, --program              program the chip
   -v, --verify               verify memory
@@ -32,7 +33,8 @@ Options:
   -t, --target <name>        specify a traget type (use '-t list' for a list of supported target types)
   -l, --list                 list all available debuggers
   -s, --serial <number>      use a debugger with a specified serial number
-  -b, --verbose              print verbose messages
+  -o, --offset <number>      offset for the operation
+  -z, --size <number>        size for the operation
 ```
 
 ## Examples

@@ -76,12 +76,13 @@ static device_t devices[] =
   { 0, "", 0, 0, 0, 0, 0 },
 };
 
-static device_t *device;
+static device_t target_device;
+static target_options_t target_options;
 
 /*- Implementations ---------------------------------------------------------*/
 
 //-----------------------------------------------------------------------------
-static void target_select(void)
+static void target_select(target_options_t *options)
 {
   uint32_t dsu_did;
 
@@ -92,11 +93,17 @@ static void target_select(void)
 
   dsu_did = dap_read_word(DSU_DID);
 
-  for (device = devices; device->dsu_did > 0; device++)
+  for (device_t *device = devices; device->dsu_did > 0; device++)
   {
     if (device->dsu_did == dsu_did)
     {
       verbose("Target: %s\n", device->name);
+
+      target_device = *device;
+      target_options = *options;
+
+      target_check_options(&target_options, device->flash_size, device->row_size);
+
       return;
     }
   }
@@ -110,55 +117,38 @@ static void target_deselect(void)
   dap_write_word(DHCSR, 0xa05f0000);
   dap_write_word(DEMCR, 0x00000000);
   dap_write_word(AIRCR, 0x05fa0004);
+
+  target_free_options(&target_options);
 }
 
 //-----------------------------------------------------------------------------
 static void target_erase(void)
 {
-  verbose("Erasing... ");
-
   dap_write_word(DSU_CTRL_STATUS, 0x00001f00); // Clear flags
   dap_write_word(DSU_CTRL_STATUS, 0x00000010); // Chip erase
   usleep(100000);
   while (0 == (dap_read_word(0x41002100) & 0x00000100));
-
-  verbose("done.\n");
 }
 
 //-----------------------------------------------------------------------------
 static void target_lock(void)
 {
-  verbose("Locking... ");
-
   dap_write_word(0x41004000, 0x0000a545); // Set Security Bit
-
-  verbose("done.\n");
 }
 
 //-----------------------------------------------------------------------------
-static void target_program(char *name, uint32_t offset)
+static void target_program(void)
 {
-  uint32_t addr = device->flash_start + offset;
-  uint32_t size;
+  uint32_t addr = target_device.flash_start + target_options.offset;
   uint32_t offs = 0;
   uint32_t number_of_rows;
-  uint8_t *buf;
+  uint8_t *buf = target_options.file_data;
+  uint32_t size = target_options.file_size;
 
   if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
     error_exit("devices is locked, perform a chip erase before programming");
 
-
-  buf = buf_alloc(device->flash_size);
-
-  size = load_file(name, buf, device->flash_size);
-
-  check_offset(device->row_size, device->flash_size, size, offset);
-
-  memset(&buf[size], 0xff, device->flash_size - size);
-
-  verbose("Programming (offset 0x%X)...", offset);
-
-  number_of_rows = (size + device->row_size - 1) / device->row_size;
+  number_of_rows = (size + target_device.row_size - 1) / target_device.row_size;
 
   dap_write_word(0x41004004, 0); // Enable automatic write
 
@@ -172,44 +162,35 @@ static void target_program(char *name, uint32_t offset)
     dap_write_word(0x41004000, 0x0000a502); // Erase Row
     while (0 == (dap_read_word(0x41004014) & 1));
 
-    dap_write_block(addr, &buf[offs], device->row_size);
+    dap_write_block(addr, &buf[offs], target_device.row_size);
 
-    addr += device->row_size;
-    offs += device->row_size;
+    addr += target_device.row_size;
+    offs += target_device.row_size;
 
     verbose(".");
   }
-
-  buf_free(buf);
-
-  verbose(" done.\n");
 }
 
 //-----------------------------------------------------------------------------
-static void target_verify(char *name, uint32_t offset)
+static void target_verify(void)
 {
-  uint32_t addr = device->flash_start + offset;
-  uint32_t size, block_size;
+  uint32_t addr = target_device.flash_start + target_options.offset;
+  uint32_t block_size;
   uint32_t offs = 0;
-  uint8_t *bufa, *bufb;
+  uint8_t *bufb;
+  uint8_t *bufa = target_options.file_data;
+  uint32_t size = target_options.file_size;
 
   if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
     error_exit("devices is locked, unable to verify");
 
-  bufa = buf_alloc(device->flash_size);
-  bufb = buf_alloc(device->row_size);
-
-  size = load_file(name, bufa, device->flash_size);
-
-  check_offset(device->row_size, device->flash_size, size, offset);
-
-  verbose("Verification (offset 0x%X)...", offset);
+  bufb = buf_alloc(target_device.row_size);
 
   while (size)
   {
-    dap_read_block(addr, bufb, device->row_size);
+    dap_read_block(addr, bufb, target_device.row_size);
 
-    block_size = (size > device->row_size) ? device->row_size : size;
+    block_size = (size > target_device.row_size) ? target_device.row_size : size;
 
     for (int i = 0; i < (int)block_size; i++)
     {
@@ -217,56 +198,44 @@ static void target_verify(char *name, uint32_t offset)
       {
         verbose("\nat address 0x%x expected 0x%02x, read 0x%02x\n",
             addr + i, bufa[offs + i], bufb[i]);
-        free(bufa);
-        free(bufb);
+        buf_free(bufb);
         error_exit("verification failed");
       }
     }
 
-    addr += device->row_size;
-    offs += device->row_size;
+    addr += target_device.row_size;
+    offs += target_device.row_size;
     size -= block_size;
 
     verbose(".");
   }
 
-  free(bufa);
-  free(bufb);
-
-  verbose(" done.\n");
+  buf_free(bufb);
 }
 
 //-----------------------------------------------------------------------------
-static void target_read(char *name)
+static void target_read(void)
 {
-  uint32_t size = device->flash_size;
-  uint32_t addr = device->flash_start;
+  uint32_t addr = target_device.flash_start + target_options.offset;
   uint32_t offs = 0;
-  uint8_t *buf;
+  uint8_t *buf = target_options.file_data;
+  uint32_t size = target_options.size;
 
   if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
     error_exit("devices is locked, unable to read");
 
-  buf = buf_alloc(device->flash_size);
-
-  verbose("Reading...");
-
   while (size)
   {
-    dap_read_block(addr, &buf[offs], device->row_size);
+    dap_read_block(addr, &buf[offs], target_device.row_size);
 
-    addr += device->row_size;
-    offs += device->row_size;
-    size -= device->row_size;
+    addr += target_device.row_size;
+    offs += target_device.row_size;
+    size -= target_device.row_size;
 
     verbose(".");
   }
 
-  save_file(name, buf, device->flash_size);
-
-  buf_free(buf);
-
-  verbose(" done.\n");
+  save_file(target_options.name, buf, target_options.size);
 }
 
 //-----------------------------------------------------------------------------

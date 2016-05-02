@@ -44,7 +44,7 @@ extern target_ops_t target_atmel_cm7_ops;
 static target_t targets[] =
 {
   { "atmel_cm0p",	"Atmel SAM C/D/R series",	&target_atmel_cm0p_ops },
-  { "atmel_cm3",	"Atmel SAM3X/A series",	&target_atmel_cm3_ops },
+  { "atmel_cm3",	"Atmel SAM3X/A series",		&target_atmel_cm3_ops },
   { "atmel_cm4",	"Atmel SAM G and SAM4 series",	&target_atmel_cm4_ops },
   { "atmel_cm7",	"Atmel SAM E7x/S7x/V7x series",	&target_atmel_cm7_ops },
   { NULL, NULL, NULL },
@@ -75,3 +75,46 @@ target_t *target_get_ops(char *name)
   return NULL;
 }
 
+//-----------------------------------------------------------------------------
+void target_check_options(target_options_t *options, int size, int align)
+{
+  options->file_data = NULL;
+  options->file_size = 0;
+
+  if (-1 == options->offset)
+    options->offset = 0;
+
+  if (-1 == options->size)
+    options->size = size - options->offset;
+
+  if (0 != (options->offset % align))
+    error_exit("offset must be a multiple of %d for the selected target", align);
+
+  if (0 != (options->size % align))
+    error_exit("size must be a multiple of %d for the selected target", align);
+
+  check(options->size <= size, "size is too big for the selected target");
+  check(options->offset < size, "offset is too big for the selected target");
+
+  if (options->program || options->verify)
+  {
+    options->file_data = buf_alloc(options->size);
+    options->file_size = load_file(options->name, options->file_data, options->size);
+    memset(&options->file_data[options->file_size], 0xff, options->size - options->file_size);
+
+    check((options->file_size + options->offset) <= size, "file is too big for the selected target");
+  }
+
+  else if (options->read)
+  {
+    options->file_data = buf_alloc(options->size);
+    options->file_size = options->size;
+  }
+}
+
+//-----------------------------------------------------------------------------
+void target_free_options(target_options_t *options)
+{
+  if (options->file_data)
+    buf_free(options->file_data);
+}
