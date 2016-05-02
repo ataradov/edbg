@@ -41,7 +41,7 @@ void *buf_alloc(int size);
 void buf_free(void *buf);
 int load_file(char *name, uint8_t *data, int size);
 void save_file(char *name, uint8_t *data, int size);
-void check_offset(uint32_t row_size, uint32_t flash_size, uint32_t offset);
+void check_offset(uint32_t row_size, uint32_t flash_size, uint32_t file_size, uint32_t offset);
 
 #endif // _EDBG_H_
 

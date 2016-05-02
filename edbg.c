@@ -165,10 +165,11 @@ void buf_free(void *buf)
 }
 
 //-----------------------------------------------------------------------------
-void check_offset(uint32_t row_size, uint32_t flash_size, uint32_t offset)
+void check_offset(uint32_t row_size, uint32_t flash_size, uint32_t file_size, uint32_t offset)
 {
     check(flash_size > offset, "offset is too big for selected chip");
     check(((row_size - 1) & offset) == 0, "offset is not aligned to the flash row");
+    check((file_size + offset) <= flash_size, "file will not fit in flash at selected offset");
 }
 
 //-----------------------------------------------------------------------------
@@ -186,7 +187,7 @@ int load_file(char *name, uint8_t *data, int size)
 
   fstat(fd, &stat);
 
-  check(stat.st_size <= size, "image is too big for the selected chip at selected offset");
+  check(stat.st_size <= size, "image is too big for the selected chip");
 
   rsize = read(fd, data, stat.st_size);
 
