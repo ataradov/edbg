@@ -40,8 +40,8 @@ typedef struct
   void (*deselect)(void);
   void (*erase)(void);
   void (*lock)(void);
-  void (*program)(char *name);
-  void (*verify)(char *name);
+  void (*program)(char *name, uint32_t offset);
+  void (*verify)(char *name, uint32_t offset);
   void (*read)(char *name);
 } target_ops_t;
 
