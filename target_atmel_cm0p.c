@@ -129,7 +129,7 @@ static void target_erase(void)
   dap_write_word(DSU_CTRL_STATUS, 0x00001f00); // Clear flags
   dap_write_word(DSU_CTRL_STATUS, 0x00000010); // Chip erase
   usleep(100000);
-  while (0 == (dap_read_word(0x41002100) & 0x00000100));
+  while (0 == (dap_read_word(DSU_CTRL_STATUS) & 0x00000100));
 }
 
 //-----------------------------------------------------------------------------
@@ -148,7 +148,7 @@ static void target_program(void)
   uint32_t size = target_options.file_size;
 
   if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
-    error_exit("devices is locked, perform a chip erase before programming");
+    error_exit("device is locked, perform a chip erase before programming");
 
   number_of_rows = (size + target_device.row_size - 1) / target_device.row_size;
 
@@ -184,7 +184,7 @@ static void target_verify(void)
   uint32_t size = target_options.file_size;
 
   if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
-    error_exit("devices is locked, unable to verify");
+    error_exit("device is locked, unable to verify");
 
   bufb = buf_alloc(target_device.row_size);
 
@@ -224,7 +224,7 @@ static void target_read(void)
   uint32_t size = target_options.size;
 
   if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
-    error_exit("devices is locked, unable to read");
+    error_exit("device is locked, unable to read");
 
   while (size)
   {
