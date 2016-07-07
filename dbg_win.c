@@ -165,7 +165,7 @@ int dbg_get_report_size(void)
 int dbg_dap_cmd(uint8_t *data, int size, int rsize)
 {
   char cmd = data[0];
-  long res;
+  unsigned long res;
 
   memset(hid_buffer, 0xff, report_size + 1);
 
@@ -181,7 +181,7 @@ int dbg_dap_cmd(uint8_t *data, int size, int rsize)
   check(hid_buffer[1] == cmd, "invalid response received");
 
   res -= 2;
-  memcpy(data, &hid_buffer[2], (size < res) ? size : res);
+  memcpy(data, &hid_buffer[2], (size < (int)res) ? size : (int)res);
 
   return res;
 }

@@ -128,7 +128,7 @@ static void target_erase(void)
 {
   dap_write_word(DSU_CTRL_STATUS, 0x00001f00); // Clear flags
   dap_write_word(DSU_CTRL_STATUS, 0x00000010); // Chip erase
-  usleep(100000);
+  sleep_ms(100);
   while (0 == (dap_read_word(DSU_CTRL_STATUS) & 0x00000100));
 }
 

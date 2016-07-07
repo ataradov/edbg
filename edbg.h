@@ -37,6 +37,7 @@ void verbose(char *fmt, ...);
 void warning(char *fmt, ...);
 void check(bool cond, char *fmt, ...);
 void error_exit(char *fmt, ...);
+void sleep_ms(int ms);
 void perror_exit(char *text);
 void *buf_alloc(int size);
 void buf_free(void *buf);
