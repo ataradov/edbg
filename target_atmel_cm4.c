@@ -55,7 +55,7 @@
 #define CMD_EA                 0x5a000005
 #define CMD_SGPB               0x5a00000b
 
-#define PAGES_IN_ERASE_BLOCK   8
+#define PAGES_IN_ERASE_BLOCK   16
 
 /*- Types -------------------------------------------------------------------*/
 typedef struct
@@ -238,7 +238,7 @@ static void target_program(void)
   {
     plane = (page + page_offset) / (target_device.flash_size / target_device.page_size);
 
-    dap_write_word(EEFC_FCR(plane), CMD_EPA | (((page + page_offset) | 1) << 8));
+    dap_write_word(EEFC_FCR(plane), CMD_EPA | (((page_offset + page) | 2) << 8));
     while (0 == (dap_read_word(EEFC_FSR(plane)) & FSR_FRDY));
 
     verbose(".");
