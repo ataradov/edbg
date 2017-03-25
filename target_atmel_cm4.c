@@ -127,7 +127,7 @@ static device_t devices[] =
   { 0x293b0ae0, 0x00000000, "SAM4N8A (Rev A)",    0x00400000, 1,  512*1024, 512 },
   { 0x294b0ae0, 0x00000000, "SAM4N8B (Rev A)",    0x00400000, 1,  512*1024, 512 },
   { 0x295b0ae0, 0x00000000, "SAM4N8C (Rev A)",    0x00400000, 1,  512*1024, 512 },
-  { 0, 0, "", 0, 0, 0, 0 },
+  { 0 },
 };
 
 static device_t target_device;
@@ -139,9 +139,6 @@ static target_options_t target_options;
 static void target_select(target_options_t *options)
 {
   uint32_t chip_id, chip_exid;
-
-  // Set boot mode GPNVM bit as a workaraound
-  dap_write_word(EEFC_FCR(0), CMD_SGPB | (1 << 8));
 
   // Stop the core
   dap_write_word(DHCSR, 0xa05f0003);
@@ -198,7 +195,6 @@ static void target_select(target_options_t *options)
 //-----------------------------------------------------------------------------
 static void target_deselect(void)
 {
-  dap_write_word(DHCSR, 0xa05f0000);
   dap_write_word(DEMCR, 0x00000000);
   dap_write_word(AIRCR, 0x05fa0004);
 
@@ -259,6 +255,9 @@ static void target_program(void)
 
     verbose(".");
   }
+
+  // Set boot mode GPNVM bit
+  dap_write_word(EEFC_FCR(0), CMD_SGPB | (1 << 8));
 }
 
 //-----------------------------------------------------------------------------
