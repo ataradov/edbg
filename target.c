@@ -87,24 +87,25 @@ void target_check_options(target_options_t *options, int size, int align)
   if (-1 == options->size)
     options->size = size - options->offset;
 
-  if (0 != (options->offset % align))
-    error_exit("offset must be a multiple of %d for the selected target", align);
+  if (options->fuse == false) {
+    if (0 != (options->offset % align))
+      error_exit("offset must be a multiple of %d for the selected target", align);
+  
+    if (0 != (options->size % align))
+      error_exit("size must be a multiple of %d for the selected target", align);
 
-  if (0 != (options->size % align))
-    error_exit("size must be a multiple of %d for the selected target", align);
+    check(options->size <= size, "size is too big for the selected target");
+    check(options->offset < size, "offset is too big for the selected target");
 
-  check(options->size <= size, "size is too big for the selected target");
-  check(options->offset < size, "offset is too big for the selected target");
+    if (options->program || options->verify)
+    {
+      options->file_data = buf_alloc(options->size);
+      options->file_size = load_file(options->name, options->file_data, options->size);
+      memset(&options->file_data[options->file_size], 0xff, options->size - options->file_size);
 
-  if (options->program || options->verify)
-  {
-    options->file_data = buf_alloc(options->size);
-    options->file_size = load_file(options->name, options->file_data, options->size);
-    memset(&options->file_data[options->file_size], 0xff, options->size - options->file_size);
-
-    check((options->file_size + options->offset) <= size, "file is too big for the selected target");
+      check((options->file_size + options->offset) <= size, "file is too big for the selected target");
+    }
   }
-
   else if (options->read)
   {
     options->file_data = buf_alloc(options->size);
