@@ -31,6 +31,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdio.h>
 #include "target.h"
 #include "edbg.h"
 #include "dap.h"
@@ -54,8 +55,20 @@
 #define CMD_EPA                0x5a000007
 #define CMD_EA                 0x5a000005
 #define CMD_SGPB               0x5a00000b
+#define CMD_CGPB               0x5a00000c
+#define CMD_GGPB               0x5a00000d
 
 #define PAGES_IN_ERASE_BLOCK   16
+
+#define GPNVM_SECURITY_BIT     0
+#define GPNVM_BMS_BIT          1
+#define GPNVM_USER_BIT_0       2
+#define GPNVM_USER_BIT_1       3
+#define GPNVM_USER_BIT_2       4
+#define GPNVM_USER_BIT_3       5
+#define GPNVM_RESERVED_BIT     6
+#define GPNVM_ITCM_BIT         7
+#define GPNVM_DTCM_BIT         8
 
 /*- Types -------------------------------------------------------------------*/
 typedef struct
@@ -91,6 +104,7 @@ static device_t devices[] =
   { 0xa1120c00, 0x00000000, "SAM S70J20", 0x00400000,   1024*1024, 512 },
   { 0xa11d0a00, 0x00000000, "SAM S70J19", 0x00400000,    512*1024, 512 },
   { 0xa1220e00, 0x00000002, "SAM V71Q21", 0x00400000, 2*1024*1024, 512 },
+  { 0xa1220e01, 0x00000002, "SAM V71Q21 (Rev B)", 0x00400000, 2*1024*1024, 512 },
   { 0xa1220c00, 0x00000002, "SAM V71Q20", 0x00400000,   1024*1024, 512 },
   { 0xa12d0a00, 0x00000002, "SAM V71Q19", 0x00400000,    512*1024, 512 },
   { 0xa1220e00, 0x00000001, "SAM V71N21", 0x00400000, 2*1024*1024, 512 },
@@ -191,6 +205,78 @@ static void target_lock(void)
 }
 
 //-----------------------------------------------------------------------------
+static uint32_t target_fuse_read(void)
+{
+  uint32_t gpnvm = 0;
+
+  dap_write_word(EEFC_FCR, CMD_GGPB);
+  while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
+  gpnvm = dap_read_word(EEFC_FRR);
+
+  return gpnvm;
+}
+
+//-----------------------------------------------------------------------------
+static void target_fuse_write(uint32_t mask)
+{
+  if (mask & (1<<GPNVM_SECURITY_BIT)) {
+    while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
+    dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_SECURITY_BIT << 8));
+  } else {
+    // we cannot clear the security bit so do nothing.
+  }
+
+  if (mask & (1<<GPNVM_BMS_BIT)) {
+    while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
+    dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_BMS_BIT << 8));
+  } else {
+    dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_BMS_BIT << 8));
+  }
+
+  if (mask & (1<<GPNVM_USER_BIT_0)) {
+    while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
+    dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_USER_BIT_0 << 8));
+  } else {
+    dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_USER_BIT_0 << 8));
+  }
+
+  if (mask & (1<<GPNVM_USER_BIT_1)) {
+    while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
+    dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_USER_BIT_1 << 8));
+  } else {
+    dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_USER_BIT_1 << 8));
+  }
+
+  if (mask & (1<<GPNVM_USER_BIT_2)) {
+    while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
+    dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_USER_BIT_2 << 8));
+  } else {
+    dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_USER_BIT_2 << 8));
+  }
+
+  if (mask & (1<<GPNVM_USER_BIT_3)) {
+    while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
+    dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_USER_BIT_3 << 8));
+  } else {
+    dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_USER_BIT_3 << 8));
+  }
+
+  if (mask & (1<<GPNVM_ITCM_BIT)) {
+    while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
+    dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_ITCM_BIT << 8));
+  } else {
+    dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_ITCM_BIT << 8));
+  }
+
+  if (mask & (1<<GPNVM_DTCM_BIT)) {
+    while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
+    dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_DTCM_BIT << 8));
+  } else {
+    dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_DTCM_BIT << 8));
+  }
+}
+
+//-----------------------------------------------------------------------------
 static void target_program(void)
 {
   uint32_t addr = target_device.flash_start + target_options.offset;
@@ -198,6 +284,17 @@ static void target_program(void)
   uint32_t offs = 0;
   uint8_t *buf = target_options.file_data;
   uint32_t size = target_options.file_size;
+  uint32_t fuse_mask = target_options.offset;
+  uint32_t gpnvm = 0;
+
+  if (target_options.fuse == true) {
+      gpnvm = target_fuse_read();
+      printf("Old GPNVM row:  0x%X\r\n", gpnvm);
+      target_fuse_write(fuse_mask);
+      gpnvm = target_fuse_read();
+      printf("New GPNVM row:  0x%X\r\n", gpnvm);
+      return;
+  }
 
   number_of_pages = (size + target_device.page_size - 1) / target_device.page_size;
   page_offset = target_options.offset / target_device.page_size;
@@ -274,6 +371,13 @@ static void target_read(void)
   uint32_t offs = 0;
   uint8_t *buf = target_options.file_data;
   uint32_t size = target_options.size;
+  uint32_t gpnvm = 0;
+
+  if (target_options.fuse == true) {
+    gpnvm = target_fuse_read();
+    printf("GPNVM row:  0x%X\r\n", gpnvm);
+    return;
+  }
 
   while (size)
   {

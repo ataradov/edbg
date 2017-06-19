@@ -41,6 +41,7 @@ typedef struct
   bool         verify;
   bool         lock;
   bool         read;
+  bool         fuse;
   char         *name;
   int32_t      offset;
   int32_t      size;

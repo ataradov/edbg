@@ -72,10 +72,11 @@ static const struct option long_options[] =
   { "serial",    required_argument,  0, 's' },
   { "offset",    required_argument,  0, 'o' },
   { "size",      required_argument,  0, 'z' },
+  { "fuse",      no_argument,        0, 'F' },
   { 0, 0, 0, 0 }
 };
 
-static const char *short_options = "hbepvkrf:t:ls:o:z:";
+static const char *short_options = "hbepvkrf:t:ls:o:z:F";
 
 static char *g_serial = NULL;
 static bool g_list = false;
@@ -89,6 +90,7 @@ static target_options_t g_target_options =
   .verify  = false,
   .lock    = false,
   .read    = false,
+  .fuse    = false,
   .name    = NULL,
   .offset  = -1,
   .size    = -1,
@@ -265,6 +267,7 @@ static void print_help(char *name)
   printf("  -s, --serial <number>      use a debugger with a specified serial number\n");
   printf("  -o, --offset <number>      offset for the operation\n");
   printf("  -z, --size <number>        size for the operation\n");
+  printf("  -F, --fuse                 program or read GPNVM/Fuses in supported devices.  Used with -p -o <mask> for program operation and -r for read operation\n");
   exit(0);
 }
 
@@ -291,6 +294,7 @@ static void parse_command_line(int argc, char **argv)
       case 'b': g_verbose = true; break;
       case 'o': g_target_options.offset = (uint32_t)strtoul(optarg, NULL, 0); break;
       case 'z': g_target_options.size = (uint32_t)strtoul(optarg, NULL, 0); break;
+      case 'F': g_target_options.fuse = true; break;
       default: exit(1); break;
     }
   }
