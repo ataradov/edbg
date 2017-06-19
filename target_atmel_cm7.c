@@ -219,63 +219,61 @@ static uint32_t target_fuse_read(void)
 //-----------------------------------------------------------------------------
 static void target_fuse_write(uint32_t mask)
 {
-  //if (mask & 0x1bc) {
-    if (mask & (1<<GPNVM_SECURITY_BIT)) {
-      while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
-      dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_SECURITY_BIT << 8));
-    } else {
-      //dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_SECURITY_BIT << 8));
-    }
-    
-    if (mask & (1<<GPNVM_BMS_BIT)) {
-      while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
-      dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_BMS_BIT << 8));
-    } else {
-      dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_BMS_BIT << 8));
-    }
+  if (mask & (1<<GPNVM_SECURITY_BIT)) {
+    while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
+    dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_SECURITY_BIT << 8));
+  } else {
+    // we cannot clear the security bit so do nothing.
+  }
 
-    if (mask & (1<<GPNVM_USER_BIT_0)) {
-      while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
-      dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_USER_BIT_0 << 8));
-    } else {
-      dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_USER_BIT_0 << 8));
-    }
+  if (mask & (1<<GPNVM_BMS_BIT)) {
+    while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
+    dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_BMS_BIT << 8));
+  } else {
+    dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_BMS_BIT << 8));
+  }
 
-    if (mask & (1<<GPNVM_USER_BIT_1)) {
-      while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
-      dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_USER_BIT_1 << 8));
-    } else {
-      dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_USER_BIT_1 << 8));
-    }
+  if (mask & (1<<GPNVM_USER_BIT_0)) {
+    while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
+    dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_USER_BIT_0 << 8));
+  } else {
+    dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_USER_BIT_0 << 8));
+  }
 
-    if (mask & (1<<GPNVM_USER_BIT_2)) {
-      while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
-      dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_USER_BIT_2 << 8));
-    } else {
-      dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_USER_BIT_2 << 8));
-    }
+  if (mask & (1<<GPNVM_USER_BIT_1)) {
+    while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
+    dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_USER_BIT_1 << 8));
+  } else {
+    dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_USER_BIT_1 << 8));
+  }
 
-    if (mask & (1<<GPNVM_USER_BIT_3)) {
-      while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
-      dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_USER_BIT_3 << 8));
-    } else {
-      dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_USER_BIT_3 << 8));
-    }
+  if (mask & (1<<GPNVM_USER_BIT_2)) {
+    while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
+    dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_USER_BIT_2 << 8));
+  } else {
+    dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_USER_BIT_2 << 8));
+  }
 
-    if (mask & (1<<GPNVM_ITCM_BIT)) {
-      while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
-      dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_ITCM_BIT << 8));
-    } else {
-      dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_ITCM_BIT << 8));
-    }
+  if (mask & (1<<GPNVM_USER_BIT_3)) {
+    while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
+    dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_USER_BIT_3 << 8));
+  } else {
+    dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_USER_BIT_3 << 8));
+  }
 
-    if (mask & (1<<GPNVM_DTCM_BIT)) {
-      while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
-      dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_DTCM_BIT << 8));
-    } else {
-      dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_DTCM_BIT << 8));
-    }
-  //}
+  if (mask & (1<<GPNVM_ITCM_BIT)) {
+    while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
+    dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_ITCM_BIT << 8));
+  } else {
+    dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_ITCM_BIT << 8));
+  }
+
+  if (mask & (1<<GPNVM_DTCM_BIT)) {
+    while (0 == (dap_read_word(EEFC_FSR) & FSR_FRDY));
+    dap_write_word(EEFC_FCR, CMD_SGPB | (GPNVM_DTCM_BIT << 8));
+  } else {
+    dap_write_word(EEFC_FCR, CMD_CGPB | (GPNVM_DTCM_BIT << 8));
+  }
 }
 
 //-----------------------------------------------------------------------------

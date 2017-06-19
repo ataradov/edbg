@@ -90,7 +90,7 @@ void target_check_options(target_options_t *options, int size, int align)
   if (options->fuse == false) {
     if (0 != (options->offset % align))
       error_exit("offset must be a multiple of %d for the selected target", align);
-  
+
     if (0 != (options->size % align))
       error_exit("size must be a multiple of %d for the selected target", align);
 
