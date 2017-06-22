@@ -34,6 +34,7 @@
 
 /*- Prototypes --------------------------------------------------------------*/
 void verbose(char *fmt, ...);
+void message(char *fmt, ...);
 void warning(char *fmt, ...);
 void check(bool cond, char *fmt, ...);
 void error_exit(char *fmt, ...);
@@ -43,6 +44,8 @@ void *buf_alloc(int size);
 void buf_free(void *buf);
 int load_file(char *name, uint8_t *data, int size);
 void save_file(char *name, uint8_t *data, int size);
+uint32_t extract_value(uint8_t *buf, int start, int end);
+void apply_value(uint8_t *buf, uint32_t value, int start, int end);
 
 #endif // _EDBG_H_
 

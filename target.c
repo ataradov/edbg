@@ -35,6 +35,9 @@
 #include "edbg.h"
 #include "dap.h"
 
+/*- Definitions -------------------------------------------------------------*/
+#define MAX_FUSE_SIZE    256 // Maximum among all targets for now
+
 /*- Variables ---------------------------------------------------------------*/
 extern target_ops_t target_atmel_cm0p_ops;
 extern target_ops_t target_atmel_cm3_ops;
@@ -104,11 +107,25 @@ void target_check_options(target_options_t *options, int size, int align)
 
     check((options->file_size + options->offset) <= size, "file is too big for the selected target");
   }
-
   else if (options->read)
   {
     options->file_data = buf_alloc(options->size);
     options->file_size = options->size;
+  }
+
+  if (options->fuse_name)
+  {
+    options->fuse_data = buf_alloc(MAX_FUSE_SIZE);
+    memset(options->fuse_data, 0xff, MAX_FUSE_SIZE);
+
+    if (options->fuse_write || options->fuse_verify)
+    {
+      options->fuse_size = load_file(options->fuse_name, options->fuse_data, MAX_FUSE_SIZE);
+    }
+    else if (options->fuse_read)
+    {
+      options->file_size = MAX_FUSE_SIZE;
+    }
   }
 }
 
@@ -118,3 +135,4 @@ void target_free_options(target_options_t *options)
   if (options->file_data)
     buf_free(options->file_data);
 }
+

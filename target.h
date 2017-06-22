@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015, Alex Taradov <alex@taradov.com>
+ * Copyright (c) 2013-2017, Alex Taradov <alex@taradov.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,6 +32,15 @@
 /*- Includes ----------------------------------------------------------------*/
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdalign.h>
+
+/*- Definitions -------------------------------------------------------------*/
+enum
+{
+  TARGET_FUSE_READ   = (1 << 0),
+  TARGET_FUSE_WRITE  = (1 << 1),
+  TARGET_FUSE_VERIFY = (1 << 2),
+};
 
 /*- Types -------------------------------------------------------------------*/
 typedef struct
@@ -41,6 +50,14 @@ typedef struct
   bool         verify;
   bool         lock;
   bool         read;
+  bool         fuse;
+  bool         fuse_read;
+  bool         fuse_write;
+  bool         fuse_verify;
+  int          fuse_start;
+  int          fuse_end;
+  uint32_t     fuse_value;
+  char         *fuse_name;
   char         *name;
   int32_t      offset;
   int32_t      size;
@@ -48,6 +65,9 @@ typedef struct
   // For target use only
   int          file_size;
   uint8_t      *file_data;
+
+  int          fuse_size;
+  uint8_t      *fuse_data;
 } target_options_t;
 
 typedef struct
@@ -59,6 +79,7 @@ typedef struct
   void (*program)(void);
   void (*verify)(void);
   void (*read)(void);
+  void (*fuse)(void);
 } target_ops_t;
 
 typedef struct

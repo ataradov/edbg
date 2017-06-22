@@ -35,7 +35,7 @@ else
   endif
 endif
 
-CFLAGS += -W -Wall -Wextra -O2 -std=gnu99
+CFLAGS += -W -Wall -Wextra -O2 -std=gnu11
 
 all: $(BIN)
 
