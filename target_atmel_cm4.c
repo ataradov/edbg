@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015, Alex Taradov <alex@taradov.com>
+ * Copyright (c) 2013-2017, Alex Taradov <alex@taradov.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,6 +36,9 @@
 #include "dap.h"
 
 /*- Definitions -------------------------------------------------------------*/
+#define FLASH_START            0x00400000
+#define FLASH_PAGE_SIZE        512
+
 #define DHCSR                  0xe000edf0
 #define DEMCR                  0xe000edfc
 #define AIRCR                  0xe000ed0c
@@ -54,8 +57,13 @@
 #define CMD_EPA                0x5a000007
 #define CMD_EA                 0x5a000005
 #define CMD_SGPB               0x5a00000b
+#define CMD_CGPB               0x5a00000c
+#define CMD_GGPB               0x5a00000d
 
 #define PAGES_IN_ERASE_BLOCK   16
+
+#define GPNVM_SIZE             1
+#define GPNVM_SIZE_BITS        8
 
 /*- Types -------------------------------------------------------------------*/
 typedef struct
@@ -63,70 +71,67 @@ typedef struct
   uint32_t  chip_id;
   uint32_t  chip_exid;
   char      *name;
-  uint32_t  flash_start;
   uint32_t  n_planes;
   uint32_t  flash_size;
-  uint32_t  page_size;
 } device_t;
-
 
 /*- Variables ---------------------------------------------------------------*/
 static device_t devices[] =
 {
-  { 0x243b09e0, 0x00000000, "SAM G51G18",         0x00400000, 1,  256*1024, 512 },
-  { 0x243b09e8, 0x00000000, "SAM G51N18",         0x00400000, 1,  256*1024, 512 },
-  { 0x247e0ae0, 0x00000000, "SAM G53G19 (Rev A)", 0x00400000, 1,  512*1024, 512 },
-  { 0x247e0ae1, 0x00000000, "SAM G53G19 (Rev B)", 0x00400000, 1,  512*1024, 512 },
-  { 0x247e0ae8, 0x00000000, "SAM G53N19 (Rev A)", 0x00400000, 1,  512*1024, 512 },
-  { 0x247e0ae9, 0x00000000, "SAM G53N19 (Rev B)", 0x00400000, 1,  512*1024, 512 },
-  { 0x247e0ae2, 0x00000000, "SAM G54G19 (Rev A)", 0x00400000, 1,  512*1024, 512 },
-  { 0x247e0ae3, 0x00000000, "SAM G54G19 (Rev B)", 0x00400000, 1,  512*1024, 512 },
-  { 0x247e0ae6, 0x00000000, "SAM G54J19 (Rev A)", 0x00400000, 1,  512*1024, 512 },
-  { 0x247e0aea, 0x00000000, "SAM G54N19 (Rev A)", 0x00400000, 1,  512*1024, 512 },
-  { 0x247e0aeb, 0x00000000, "SAM G54N19 (Rev B)", 0x00400000, 1,  512*1024, 512 },
-  { 0x24470ae0, 0x00000000, "SAM G55G19",         0x00400000, 1,  512*1024, 512 },
-  { 0x24570ae0, 0x00000000, "SAM G55J19",         0x00400000, 1,  512*1024, 512 },
-  { 0x29970ee0, 0x00000000, "SAM4SD32B (Rev A)",  0x00400000, 2, 1024*1024, 512 },
-  { 0x29970ee1, 0x00000000, "SAM4SD32B (Rev B)",  0x00400000, 2, 1024*1024, 512 },
-  { 0x29a70ee0, 0x00000000, "SAM4SD32C (Rev A)",  0x00400000, 2, 1024*1024, 512 },
-  { 0x29a70ee1, 0x00000000, "SAM4SD32C (Rev B)",  0x00400000, 2, 1024*1024, 512 },
-  { 0x29970ce0, 0x00000000, "SAM4SD16B (Rev A)",  0x00400000, 2,  512*1024, 512 },
-  { 0x29970ce0, 0x00000000, "SAM4SD16B (Rev B)",  0x00400000, 2,  512*1024, 512 },
-  { 0x29a70ce0, 0x00000000, "SAM4SD16C (Rev A)",  0x00400000, 2,  512*1024, 512 },
-  { 0x29a70ce1, 0x00000000, "SAM4SD16C (Rev B)",  0x00400000, 2,  512*1024, 512 },
-  { 0x28970ce0, 0x00000000, "SAM4SA16B (Rev A)",  0x00400000, 1, 1024*1024, 512 },
-  { 0x28970ce1, 0x00000000, "SAM4SA16B (Rev B)",  0x00400000, 1, 1024*1024, 512 },
-  { 0x28a70ce0, 0x00000000, "SAM4SA16C (Rev A)",  0x00400000, 1, 1024*1024, 512 },
-  { 0x28a70ce1, 0x00000000, "SAM4SA16C (Rev B)",  0x00400000, 1, 1024*1024, 512 },
-  { 0x289c0ce0, 0x00000000, "SAM4S16B (Rev A)",   0x00400000, 1, 1024*1024, 512 },
-  { 0x289c0ce1, 0x00000000, "SAM4S16B (Rev B)",   0x00400000, 1, 1024*1024, 512 },
-  { 0x28ac0ce0, 0x00000000, "SAM4S16C (Rev A)",   0x00400000, 1, 1024*1024, 512 },
-  { 0x28ac0ce1, 0x00000000, "SAM4S16C (Rev B)",   0x00400000, 1, 1024*1024, 512 },
-  { 0x289c0ae0, 0x00000000, "SAM4S8B (Rev A)",    0x00400000, 1,  512*1024, 512 },
-  { 0x289c0ae1, 0x00000000, "SAM4S8B (Rev B)",    0x00400000, 1,  512*1024, 512 },
-  { 0x28ac0ae0, 0x00000000, "SAM4S8C (Rev A)",    0x00400000, 1,  512*1024, 512 },
-  { 0x28ac0ae1, 0x00000000, "SAM4S8C (Rev B)",    0x00400000, 1,  512*1024, 512 },
-  { 0x288b09e0, 0x00000000, "SAM4S4A (Rev A)",    0x00400000, 1,  256*1024, 512 },
-  { 0x288b09e1, 0x00000000, "SAM4S4A (Rev B)",    0x00400000, 1,  256*1024, 512 },
-  { 0x289b09e0, 0x00000000, "SAM4S4B (Rev A)",    0x00400000, 1,  256*1024, 512 },
-  { 0x289b09e1, 0x00000000, "SAM4S4B (Rev B)",    0x00400000, 1,  256*1024, 512 },
-  { 0x28ab09e0, 0x00000000, "SAM4S4C (Rev A)",    0x00400000, 1,  256*1024, 512 },
-  { 0x28ab09e1, 0x00000000, "SAM4S4C (Rev B)",    0x00400000, 1,  256*1024, 512 },
-  { 0x288b07e0, 0x00000000, "SAM4S2A (Rev A)",    0x00400000, 1,  128*1024, 512 },
-  { 0x288b07e1, 0x00000000, "SAM4S2A (Rev B)",    0x00400000, 1,  128*1024, 512 },
-  { 0x289b07e0, 0x00000000, "SAM4S2B (Rev A)",    0x00400000, 1,  128*1024, 512 },
-  { 0x289b07e1, 0x00000000, "SAM4S2B (Rev B)",    0x00400000, 1,  128*1024, 512 },
-  { 0x28ab07e0, 0x00000000, "SAM4S2C (Rev A)",    0x00400000, 1,  128*1024, 512 },
-  { 0x28ab07e1, 0x00000000, "SAM4S2C (Rev B)",    0x00400000, 1,  128*1024, 512 },
-  { 0xa3cc0ce0, 0x00120200, "SAM4E16E",           0x00400000, 1, 1024*1024, 512 },
-  { 0xa3cc0ce0, 0x00120208, "SAM4E8E",            0x00400000, 1,  512*1024, 512 },
-  { 0xa3cc0ce0, 0x00120201, "SAM4E16C",           0x00400000, 1, 1024*1024, 512 },
-  { 0xa3cc0ce0, 0x00120209, "SAM4E8C",            0x00400000, 1,  512*1024, 512 },
-  { 0x29460ce0, 0x00000000, "SAM4N16B (Rev A)",   0x00400000, 1, 1024*1024, 512 },
-  { 0x29560ce0, 0x00000000, "SAM4N16C (Rev A)",   0x00400000, 1, 1024*1024, 512 },
-  { 0x293b0ae0, 0x00000000, "SAM4N8A (Rev A)",    0x00400000, 1,  512*1024, 512 },
-  { 0x294b0ae0, 0x00000000, "SAM4N8B (Rev A)",    0x00400000, 1,  512*1024, 512 },
-  { 0x295b0ae0, 0x00000000, "SAM4N8C (Rev A)",    0x00400000, 1,  512*1024, 512 },
+  { 0x243b09e0, 0x00000000, "SAM G51G18",          1,  256*1024 },
+  { 0x243b09e8, 0x00000000, "SAM G51N18",          1,  256*1024 },
+  { 0x247e0ae0, 0x00000000, "SAM G53G19 (Rev A)",  1,  512*1024 },
+  { 0x247e0ae1, 0x00000000, "SAM G53G19 (Rev B)",  1,  512*1024 },
+  { 0x247e0ae8, 0x00000000, "SAM G53N19 (Rev A)",  1,  512*1024 },
+  { 0x247e0ae9, 0x00000000, "SAM G53N19 (Rev B)",  1,  512*1024 },
+  { 0x247e0ae2, 0x00000000, "SAM G54G19 (Rev A)",  1,  512*1024 },
+  { 0x247e0ae3, 0x00000000, "SAM G54G19 (Rev B)",  1,  512*1024 },
+  { 0x247e0ae6, 0x00000000, "SAM G54J19 (Rev A)",  1,  512*1024 },
+  { 0x247e0aea, 0x00000000, "SAM G54N19 (Rev A)",  1,  512*1024 },
+  { 0x247e0aeb, 0x00000000, "SAM G54N19 (Rev B)",  1,  512*1024 },
+  { 0x24470ae0, 0x00000000, "SAM G55G19",          1,  512*1024 },
+  { 0x24570ae0, 0x00000000, "SAM G55J19",          1,  512*1024 },
+  { 0x29970ee0, 0x00000000, "SAM4SD32B (Rev A)",   2, 1024*1024 },
+  { 0x29970ee1, 0x00000000, "SAM4SD32B (Rev B)",   2, 1024*1024 },
+  { 0x29a70ee0, 0x00000000, "SAM4SD32C (Rev A)",   2, 1024*1024 },
+  { 0x29a70ee1, 0x00000000, "SAM4SD32C (Rev B)",   2, 1024*1024 },
+  { 0x29970ce0, 0x00000000, "SAM4SD16B (Rev A)",   2,  512*1024 },
+  { 0x29970ce0, 0x00000000, "SAM4SD16B (Rev B)",   2,  512*1024 },
+  { 0x29a70ce0, 0x00000000, "SAM4SD16C (Rev A)",   2,  512*1024 },
+  { 0x29a70ce1, 0x00000000, "SAM4SD16C (Rev B)",   2,  512*1024 },
+  { 0x28970ce0, 0x00000000, "SAM4SA16B (Rev A)",   1, 1024*1024 },
+  { 0x28970ce1, 0x00000000, "SAM4SA16B (Rev B)",   1, 1024*1024 },
+  { 0x28a70ce0, 0x00000000, "SAM4SA16C (Rev A)",   1, 1024*1024 },
+  { 0x28a70ce1, 0x00000000, "SAM4SA16C (Rev B)",   1, 1024*1024 },
+  { 0x289c0ce0, 0x00000000, "SAM4S16B (Rev A)",    1, 1024*1024 },
+  { 0x289c0ce1, 0x00000000, "SAM4S16B (Rev B)",    1, 1024*1024 },
+  { 0x28ac0ce0, 0x00000000, "SAM4S16C (Rev A)",    1, 1024*1024 },
+  { 0x28ac0ce1, 0x00000000, "SAM4S16C (Rev B)",    1, 1024*1024 },
+  { 0x289c0ae0, 0x00000000, "SAM4S8B (Rev A)",     1,  512*1024 },
+  { 0x289c0ae1, 0x00000000, "SAM4S8B (Rev B)",     1,  512*1024 },
+  { 0x28ac0ae0, 0x00000000, "SAM4S8C (Rev A)",     1,  512*1024 },
+  { 0x28ac0ae1, 0x00000000, "SAM4S8C (Rev B)",     1,  512*1024 },
+  { 0x288b09e0, 0x00000000, "SAM4S4A (Rev A)",     1,  256*1024 },
+  { 0x288b09e1, 0x00000000, "SAM4S4A (Rev B)",     1,  256*1024 },
+  { 0x289b09e0, 0x00000000, "SAM4S4B (Rev A)",     1,  256*1024 },
+  { 0x289b09e1, 0x00000000, "SAM4S4B (Rev B)",     1,  256*1024 },
+  { 0x28ab09e0, 0x00000000, "SAM4S4C (Rev A)",     1,  256*1024 },
+  { 0x28ab09e1, 0x00000000, "SAM4S4C (Rev B)",     1,  256*1024 },
+  { 0x288b07e0, 0x00000000, "SAM4S2A (Rev A)",     1,  128*1024 },
+  { 0x288b07e1, 0x00000000, "SAM4S2A (Rev B)",     1,  128*1024 },
+  { 0x289b07e0, 0x00000000, "SAM4S2B (Rev A)",     1,  128*1024 },
+  { 0x289b07e1, 0x00000000, "SAM4S2B (Rev B)",     1,  128*1024 },
+  { 0x28ab07e0, 0x00000000, "SAM4S2C (Rev A)",     1,  128*1024 },
+  { 0x28ab07e1, 0x00000000, "SAM4S2C (Rev B)",     1,  128*1024 },
+  { 0xa3cc0ce0, 0x00120200, "SAM4E16E",            1, 1024*1024 },
+  { 0xa3cc0ce0, 0x00120208, "SAM4E8E",             1,  512*1024 },
+  { 0xa3cc0ce0, 0x00120201, "SAM4E16C",            1, 1024*1024 },
+  { 0xa3cc0ce0, 0x00120209, "SAM4E8C",             1,  512*1024 },
+  { 0x29460ce0, 0x00000000, "SAM4N16B (Rev A)",    1, 1024*1024 },
+  { 0x29560ce0, 0x00000000, "SAM4N16C (Rev A)",    1, 1024*1024 },
+  { 0x293b0ae0, 0x00000000, "SAM4N8A (Rev A)",     1,  512*1024 },
+  { 0x294b0ae0, 0x00000000, "SAM4N8B (Rev A)",     1,  512*1024 },
+  { 0x295b0ae0, 0x00000000, "SAM4N8C (Rev A)",     1,  512*1024 },
   { 0 },
 };
 
@@ -168,7 +173,7 @@ static void target_select(target_options_t *options)
         check(fl_size == device->flash_size, "Invalid reported Flash size (%d)", fl_size);
 
         fl_page_size = dap_read_word(EEFC_FRR(plane));
-        check(fl_page_size == device->page_size, "Invalid reported page size (%d)", fl_page_size);
+        check(fl_page_size == FLASH_PAGE_SIZE, "Invalid reported page size (%d)", fl_page_size);
 
         fl_nb_palne = dap_read_word(EEFC_FRR(plane));
         for (uint32_t i = 0; i < fl_nb_palne; i++)
@@ -183,7 +188,7 @@ static void target_select(target_options_t *options)
       target_options = *options;
 
       target_check_options(&target_options, device->flash_size * target_device.n_planes,
-          device->page_size * PAGES_IN_ERASE_BLOCK);
+          FLASH_PAGE_SIZE * PAGES_IN_ERASE_BLOCK);
 
       return;
     }
@@ -221,18 +226,18 @@ static void target_lock(void)
 //-----------------------------------------------------------------------------
 static void target_program(void)
 {
-  uint32_t addr = target_device.flash_start + target_options.offset;
+  uint32_t addr = FLASH_START + target_options.offset;
   uint32_t number_of_pages, plane, page_offset;
   uint32_t offs = 0;
   uint8_t *buf = target_options.file_data;
   uint32_t size = target_options.file_size;
 
-  number_of_pages = (size + target_device.page_size - 1) / target_device.page_size;
-  page_offset = target_options.offset / target_device.page_size;
+  number_of_pages = (size + FLASH_PAGE_SIZE - 1) / FLASH_PAGE_SIZE;
+  page_offset = target_options.offset / FLASH_PAGE_SIZE;
 
   for (uint32_t page = 0; page < number_of_pages; page += PAGES_IN_ERASE_BLOCK)
   {
-    plane = (page + page_offset) / (target_device.flash_size / target_device.page_size);
+    plane = (page + page_offset) / (target_device.flash_size / FLASH_PAGE_SIZE);
 
     dap_write_word(EEFC_FCR(plane), CMD_EPA | (((page_offset + page) | 2) << 8));
     while (0 == (dap_read_word(EEFC_FSR(plane)) & FSR_FRDY));
@@ -244,39 +249,36 @@ static void target_program(void)
 
   for (uint32_t page = 0; page < number_of_pages; page++)
   {
-    dap_write_block(addr, &buf[offs], target_device.page_size);
-    addr += target_device.page_size;
-    offs += target_device.page_size;
+    dap_write_block(addr, &buf[offs], FLASH_PAGE_SIZE);
+    addr += FLASH_PAGE_SIZE;
+    offs += FLASH_PAGE_SIZE;
 
-    plane = (page + page_offset) / (target_device.flash_size / target_device.page_size);
+    plane = (page + page_offset) / (target_device.flash_size / FLASH_PAGE_SIZE);
 
     dap_write_word(EEFC_FCR(plane), CMD_WP | ((page + page_offset) << 8));
     while (0 == (dap_read_word(EEFC_FSR(plane)) & FSR_FRDY));
 
     verbose(".");
   }
-
-  // Set boot mode GPNVM bit
-  dap_write_word(EEFC_FCR(0), CMD_SGPB | (1 << 8));
 }
 
 //-----------------------------------------------------------------------------
 static void target_verify(void)
 {
-  uint32_t addr = target_device.flash_start + target_options.offset;
+  uint32_t addr = FLASH_START + target_options.offset;
   uint32_t block_size;
   uint32_t offs = 0;
   uint8_t *bufb;
   uint8_t *bufa = target_options.file_data;
   uint32_t size = target_options.file_size;
 
-  bufb = buf_alloc(target_device.page_size);
+  bufb = buf_alloc(FLASH_PAGE_SIZE);
 
   while (size)
   {
-    dap_read_block(addr, bufb, target_device.page_size);
+    dap_read_block(addr, bufb, FLASH_PAGE_SIZE);
 
-    block_size = (size > target_device.page_size) ? target_device.page_size : size;
+    block_size = (size > FLASH_PAGE_SIZE) ? FLASH_PAGE_SIZE : size;
 
     for (int i = 0; i < (int)block_size; i++)
     {
@@ -289,8 +291,8 @@ static void target_verify(void)
       }
     }
 
-    addr += target_device.page_size;
-    offs += target_device.page_size;
+    addr += FLASH_PAGE_SIZE;
+    offs += FLASH_PAGE_SIZE;
     size -= block_size;
 
     verbose(".");
@@ -302,23 +304,118 @@ static void target_verify(void)
 //-----------------------------------------------------------------------------
 static void target_read(void)
 {
-  uint32_t addr = target_device.flash_start + target_options.offset;
+  uint32_t addr = FLASH_START + target_options.offset;
   uint32_t offs = 0;
   uint8_t *buf = target_options.file_data;
   uint32_t size = target_options.size;
 
   while (size)
   {
-    dap_read_block(addr, &buf[offs], target_device.page_size);
+    dap_read_block(addr, &buf[offs], FLASH_PAGE_SIZE);
 
-    addr += target_device.page_size;
-    offs += target_device.page_size;
-    size -= target_device.page_size;
+    addr += FLASH_PAGE_SIZE;
+    offs += FLASH_PAGE_SIZE;
+    size -= FLASH_PAGE_SIZE;
 
     verbose(".");
   }
 
   save_file(target_options.name, buf, target_options.size);
+}
+
+//-----------------------------------------------------------------------------
+static void target_fuse(void)
+{
+  bool read_all = (-1 == target_options.fuse_start);
+  uint32_t gpnvm;
+  uint8_t *buf = (uint8_t *)&gpnvm;
+  int size = (target_options.fuse_size < GPNVM_SIZE) ?
+      target_options.fuse_size : GPNVM_SIZE;
+
+  dap_write_word(EEFC_FCR(0), CMD_GGPB);
+  while (0 == (dap_read_word(EEFC_FSR(0)) & FSR_FRDY));
+  gpnvm = dap_read_word(EEFC_FRR(0));
+
+  if (target_options.fuse_read)
+  {
+    if (target_options.fuse_name)
+    {
+      save_file(target_options.fuse_name, buf, sizeof(gpnvm));
+    }
+    else if (read_all)
+    {
+      message("GPNVM Bits: 0x%02x\n", gpnvm);
+    }
+    else
+    {
+      uint32_t value = extract_value(buf, target_options.fuse_start,
+          target_options.fuse_end);
+
+      message("GPNVM Bits: 0x%02x (%d)\n", value, value);
+    }
+  }
+
+  if (target_options.fuse_write)
+  {
+    if (target_options.fuse_name)
+    {
+      for (int i = 0; i < size; i++)
+        buf[i] = target_options.fuse_data[i];
+    }
+    else
+    {
+      apply_value(buf, target_options.fuse_value, target_options.fuse_start,
+          target_options.fuse_end);
+    }
+
+    for (int i = 0; i < GPNVM_SIZE_BITS; i++)
+    {
+      if (gpnvm & (1 << i))
+        dap_write_word(EEFC_FCR(0), CMD_SGPB | (i << 8));
+      else
+        dap_write_word(EEFC_FCR(0), CMD_CGPB | (i << 8));
+    }
+  }
+
+  if (target_options.fuse_verify)
+  {
+    dap_write_word(EEFC_FCR(0), CMD_GGPB);
+    while (0 == (dap_read_word(EEFC_FSR(0)) & FSR_FRDY));
+    gpnvm = dap_read_word(EEFC_FRR(0));
+
+    if (target_options.fuse_name)
+    {
+      for (int i = 0; i < size; i++)
+      {
+        if (target_options.fuse_data[i] != buf[i])
+        {
+          message("fuse byte %d expected 0x%02x, got 0x%02x", i,
+              target_options.fuse_data[i], buf[i]);
+          error_exit("fuse verification failed");
+        }
+      }
+    }
+    else
+    {
+      uint32_t value;
+
+      if (read_all)
+      {
+        value = gpnvm;
+      }
+      else
+      {
+        value = extract_value(buf, target_options.fuse_start,
+          target_options.fuse_end);
+      }
+
+      if (target_options.fuse_value != value)
+      {
+        error_exit("fuse verification failed: expected 0x%x (%u), got 0x%x (%u)",
+            target_options.fuse_value, target_options.fuse_value, value, value);
+      }
+    }
+  }
 }
 
 //-----------------------------------------------------------------------------
@@ -331,5 +428,6 @@ target_ops_t target_atmel_cm4_ops =
   .program  = target_program,
   .verify   = target_verify,
   .read     = target_read,
+  .fuse     = target_fuse,
 };
 

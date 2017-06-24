@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015, Alex Taradov <alex@taradov.com>
+ * Copyright (c) 2013-2017, Alex Taradov <alex@taradov.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,6 +37,10 @@
 #include "dap.h"
 
 /*- Definitions -------------------------------------------------------------*/
+#define FLASH_START            0
+#define FLASH_ROW_SIZE         256
+#define FLASH_PAGE_SIZE        64
+
 #define DHCSR                  0xe000edf0
 #define DEMCR                  0xe000edfc
 #define AIRCR                  0xe000ed0c
@@ -44,46 +48,64 @@
 #define DSU_CTRL_STATUS        0x41002100
 #define DSU_DID                0x41002118
 
+#define NVMCTRL_CTRLA          0x41004000
+#define NVMCTRL_CTRLB          0x41004004
+#define NVMCTRL_PARAM          0x41004008
+#define NVMCTRL_INTFLAG        0x41004014
+#define NVMCTRL_STATUS         0x41004018
+#define NVMCTRL_ADDR           0x4100401c
+
+#define NVMCTRL_CMD_ER         0xa502
+#define NVMCTRL_CMD_WP         0xa504
+#define NVMCTRL_CMD_EAR        0xa505
+#define NVMCTRL_CMD_WAP        0xa506
+#define NVMCTRL_CMD_WL         0xa50f
+#define NVMCTRL_CMD_UR         0xa541
+#define NVMCTRL_CMD_PBC        0xa544
+#define NVMCTRL_CMD_SSB        0xa545
+
+#define USER_ROW_ADDR          0x00804000
+#define USER_ROW_SIZE          256
+
 /*- Types -------------------------------------------------------------------*/
 typedef struct
 {
   uint32_t  dsu_did;
   char      *name;
-  uint32_t  flash_start;
   uint32_t  flash_size;
-  uint32_t  page_size;
   uint32_t  n_pages;
-  uint32_t  row_size;
 } device_t;
 
 /*- Variables ---------------------------------------------------------------*/
 static device_t devices[] =
 {
-  { 0x10040107, "SAM D09C13A",         0,   8*1024, 64,  128, 256 },
-  { 0x10020100, "SAM D10D14AM",        0,  16*1024, 64,  256, 256 },
-  { 0x10030100, "SAM D11D14A",         0,  16*1024, 64,  256, 256 },
-  { 0x10030000, "SAM D11D14AM",        0,  16*1024, 64,  256, 256 },
-  { 0x10030003, "SAM D11D14AS",        0,  16*1024, 64,  256, 256 },
-  { 0x10030006, "SAM D11C14A",         0,  16*1024, 64,  256, 256 },
-  { 0x10030106, "SAM D11C14A (Rev B)", 0,  16*1024, 64,  256, 256 },
-  { 0x1000140a, "SAM D20E18A",         0, 256*1024, 64, 4096, 256 },
-  { 0x1000120d, "SAM D20E15A",         0, 256*1024, 64, 4096, 256 },
-  { 0x10001100, "SAM D20J18A",         0, 256*1024, 64, 4096, 256 },
-  { 0x10001200, "SAM D20J18A (Rev C)", 0, 256*1024, 64, 4096, 256 },
-  { 0x10010100, "SAM D21J18A",         0, 256*1024, 64, 4096, 256 },
-  { 0x10010200, "SAM D21J18A (Rev C)", 0, 256*1024, 64, 4096, 256 },
-  { 0x10010300, "SAM D21J18A (Rev D)", 0, 256*1024, 64, 4096, 256 },
-  { 0x1001020d, "SAM D21E15A (Rev C)", 0,  32*1024, 64,  512, 256 },
-  { 0x1001030a, "SAM D21E18A",         0, 256*1024, 64, 4096, 256 },
-  { 0x10010205, "SAM D21G18A",         0, 256*1024, 64, 4096, 256 },
-  { 0x10010305, "SAM D21G18A (Rev D)", 0, 256*1024, 64, 4096, 256 },
-  { 0x10010019, "SAM R21G18 ES",       0, 256*1024, 64, 4096, 256 },
-  { 0x10010119, "SAM R21G18",          0, 256*1024, 64, 4096, 256 },
-  { 0x10010219, "SAM R21G18A (Rev C)", 0, 256*1024, 64, 4096, 256 },
-  { 0x10010319, "SAM R21G18A (Rev D)", 0, 256*1024, 64, 4096, 256 },
-  { 0x11010100, "SAM C21J18A ES",      0, 256*1024, 64, 4096, 256 },
-  { 0x10810219, "SAM L21E18B",         0, 256*1024, 64, 4096, 256 },
-  { 0x1081020f, "SAM L21J18B",         0, 256*1024, 64, 4096, 256 },
+  { 0x10040107, "SAM D09C13A",           8*1024,  128 },
+  { 0x10020100, "SAM D10D14AM",         16*1024,  256 },
+  { 0x10030100, "SAM D11D14A",          16*1024,  256 },
+  { 0x10030000, "SAM D11D14AM",         16*1024,  256 },
+  { 0x10030003, "SAM D11D14AS",         16*1024,  256 },
+  { 0x10030006, "SAM D11C14A",          16*1024,  256 },
+  { 0x10030106, "SAM D11C14A (Rev B)",  16*1024,  256 },
+  { 0x1000140a, "SAM D20E18A",         256*1024, 4096 },
+  { 0x1000120d, "SAM D20E15A",         256*1024, 4096 },
+  { 0x10001100, "SAM D20J18A",         256*1024, 4096 },
+  { 0x10001200, "SAM D20J18A (Rev C)", 256*1024, 4096 },
+  { 0x10010100, "SAM D21J18A",         256*1024, 4096 },
+  { 0x10010200, "SAM D21J18A (Rev C)", 256*1024, 4096 },
+  { 0x10010300, "SAM D21J18A (Rev D)", 256*1024, 4096 },
+  { 0x1001020d, "SAM D21E15A (Rev C)",  32*1024,  512 },
+  { 0x1001030a, "SAM D21E18A",         256*1024, 4096 },
+  { 0x10010205, "SAM D21G18A",         256*1024, 4096 },
+  { 0x10010305, "SAM D21G18A (Rev D)", 256*1024, 4096 },
+  { 0x10010019, "SAM R21G18 ES",       256*1024, 4096 },
+  { 0x10010119, "SAM R21G18",          256*1024, 4096 },
+  { 0x10010219, "SAM R21G18A (Rev C)", 256*1024, 4096 },
+  { 0x10010319, "SAM R21G18A (Rev D)", 256*1024, 4096 },
+  { 0x11010100, "SAM C21J18A ES",      256*1024, 4096 },
+  { 0x10810219, "SAM L21E18B",         256*1024, 4096 },
+  { 0x1081020f, "SAM L21J18B",         256*1024, 4096 },
+  { 0x1081021e, "SAM R30G18A",         256*1024, 4096 },
+  { 0x1081021f, "SAM R30E18A",         256*1024, 4096 },
   { 0 },
 };
 
@@ -113,7 +135,7 @@ static void target_select(target_options_t *options)
       target_device = *device;
       target_options = *options;
 
-      target_check_options(&target_options, device->flash_size, device->row_size);
+      target_check_options(&target_options, device->flash_size, FLASH_ROW_SIZE);
 
       return;
     }
@@ -143,13 +165,13 @@ static void target_erase(void)
 //-----------------------------------------------------------------------------
 static void target_lock(void)
 {
-  dap_write_word(0x41004000, 0x0000a545); // Set Security Bit
+  dap_write_word(NVMCTRL_CTRLA, NVMCTRL_CMD_SSB); // Set Security Bit
 }
 
 //-----------------------------------------------------------------------------
 static void target_program(void)
 {
-  uint32_t addr = target_device.flash_start + target_options.offset;
+  uint32_t addr = FLASH_START + target_options.offset;
   uint32_t offs = 0;
   uint32_t number_of_rows;
   uint8_t *buf = target_options.file_data;
@@ -158,24 +180,24 @@ static void target_program(void)
   if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
     error_exit("device is locked, perform a chip erase before programming");
 
-  number_of_rows = (size + target_device.row_size - 1) / target_device.row_size;
+  number_of_rows = (size + FLASH_ROW_SIZE - 1) / FLASH_ROW_SIZE;
 
-  dap_write_word(0x41004004, 0); // Enable automatic write
+  dap_write_word(NVMCTRL_CTRLB, 0); // Enable automatic write
 
   for (uint32_t row = 0; row < number_of_rows; row++)
   {
-    dap_write_word(0x4100401c, addr >> 1);
+    dap_write_word(NVMCTRL_ADDR, addr >> 1);
 
-    dap_write_word(0x41004000, 0x0000a541); // Unlock Region
-    while (0 == (dap_read_word(0x41004014) & 1));
+    dap_write_word(NVMCTRL_CTRLA, NVMCTRL_CMD_UR); // Unlock Region
+    while (0 == (dap_read_word(NVMCTRL_INTFLAG) & 1));
 
-    dap_write_word(0x41004000, 0x0000a502); // Erase Row
-    while (0 == (dap_read_word(0x41004014) & 1));
+    dap_write_word(NVMCTRL_CTRLA, NVMCTRL_CMD_ER); // Erase Row
+    while (0 == (dap_read_word(NVMCTRL_INTFLAG) & 1));
 
-    dap_write_block(addr, &buf[offs], target_device.row_size);
+    dap_write_block(addr, &buf[offs], FLASH_ROW_SIZE);
 
-    addr += target_device.row_size;
-    offs += target_device.row_size;
+    addr += FLASH_ROW_SIZE;
+    offs += FLASH_ROW_SIZE;
 
     verbose(".");
   }
@@ -184,7 +206,7 @@ static void target_program(void)
 //-----------------------------------------------------------------------------
 static void target_verify(void)
 {
-  uint32_t addr = target_device.flash_start + target_options.offset;
+  uint32_t addr = FLASH_START + target_options.offset;
   uint32_t block_size;
   uint32_t offs = 0;
   uint8_t *bufb;
@@ -194,13 +216,13 @@ static void target_verify(void)
   if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
     error_exit("device is locked, unable to verify");
 
-  bufb = buf_alloc(target_device.row_size);
+  bufb = buf_alloc(FLASH_ROW_SIZE);
 
   while (size)
   {
-    dap_read_block(addr, bufb, target_device.row_size);
+    dap_read_block(addr, bufb, FLASH_ROW_SIZE);
 
-    block_size = (size > target_device.row_size) ? target_device.row_size : size;
+    block_size = (size > FLASH_ROW_SIZE) ? FLASH_ROW_SIZE : size;
 
     for (int i = 0; i < (int)block_size; i++)
     {
@@ -213,8 +235,8 @@ static void target_verify(void)
       }
     }
 
-    addr += target_device.row_size;
-    offs += target_device.row_size;
+    addr += FLASH_ROW_SIZE;
+    offs += FLASH_ROW_SIZE;
     size -= block_size;
 
     verbose(".");
@@ -226,7 +248,7 @@ static void target_verify(void)
 //-----------------------------------------------------------------------------
 static void target_read(void)
 {
-  uint32_t addr = target_device.flash_start + target_options.offset;
+  uint32_t addr = FLASH_START + target_options.offset;
   uint32_t offs = 0;
   uint8_t *buf = target_options.file_data;
   uint32_t size = target_options.size;
@@ -236,16 +258,106 @@ static void target_read(void)
 
   while (size)
   {
-    dap_read_block(addr, &buf[offs], target_device.row_size);
+    dap_read_block(addr, &buf[offs], FLASH_ROW_SIZE);
 
-    addr += target_device.row_size;
-    offs += target_device.row_size;
-    size -= target_device.row_size;
+    addr += FLASH_ROW_SIZE;
+    offs += FLASH_ROW_SIZE;
+    size -= FLASH_ROW_SIZE;
 
     verbose(".");
   }
 
   save_file(target_options.name, buf, target_options.size);
+}
+
+
+//-----------------------------------------------------------------------------
+static void target_fuse(void)
+{
+  uint8_t buf[USER_ROW_SIZE];
+  bool read_all = (-1 == target_options.fuse_start);
+  int size = (target_options.fuse_size < USER_ROW_SIZE) ?
+      target_options.fuse_size : USER_ROW_SIZE;
+
+  dap_read_block(USER_ROW_ADDR, buf, USER_ROW_SIZE);
+
+  if (target_options.fuse_read)
+  {
+    if (target_options.fuse_name)
+    {
+      save_file(target_options.fuse_name, buf, USER_ROW_SIZE);
+    }
+    else if (read_all)
+    {
+      message("Fuses (user row): ");
+
+      for (int i = 0; i < USER_ROW_SIZE; i++)
+        message("%02x ", buf[i]);
+
+      message("\n");
+    }
+    else
+    {
+      uint32_t value = extract_value(buf, target_options.fuse_start,
+          target_options.fuse_end);
+
+      message("Fuses: 0x%x (%d)\n", value, value);
+    }
+  }
+
+  if (target_options.fuse_write)
+  {
+    if (target_options.fuse_name)
+    {
+      for (int i = 0; i < size; i++)
+        buf[i] = target_options.fuse_data[i];
+    }
+    else
+    {
+      apply_value(buf, target_options.fuse_value, target_options.fuse_start,
+          target_options.fuse_end);
+    }
+
+    dap_write_word(NVMCTRL_CTRLB, 0);
+    dap_write_word(NVMCTRL_ADDR, USER_ROW_ADDR >> 1);
+    dap_write_word(NVMCTRL_CTRLA, NVMCTRL_CMD_EAR);
+    while (0 == (dap_read_word(NVMCTRL_INTFLAG) & 1));
+
+    dap_write_block(USER_ROW_ADDR, buf, USER_ROW_SIZE);
+  }
+
+  if (target_options.fuse_verify)
+  {
+    dap_read_block(USER_ROW_ADDR, buf, USER_ROW_SIZE);
+
+    if (target_options.fuse_name)
+    {
+      for (int i = 0; i < size; i++)
+      {
+        if (target_options.fuse_data[i] != buf[i])
+        {
+          message("fuse byte %d expected 0x%02x, got 0x%02x", i,
+              target_options.fuse_data[i], buf[i]);
+          error_exit("fuse verification failed");
+        }
+      }
+    }
+    else if (read_all)
+    {
+      error_exit("please specify fuse bit range for verification");
+    }
+    else
+    {
+      uint32_t value = extract_value(buf, target_options.fuse_start,
+          target_options.fuse_end);
+
+      if (target_options.fuse_value != value)
+      {
+        error_exit("fuse verification failed: expected 0x%x (%u), got 0x%x (%u)",
+            target_options.fuse_value, target_options.fuse_value, value, value);
+      }
+    }
+  }
 }
 
 //-----------------------------------------------------------------------------
@@ -258,5 +370,6 @@ target_ops_t target_atmel_cm0p_ops =
   .program  = target_program,
   .verify   = target_verify,
   .read     = target_read,
+  .fuse     = target_fuse,
 };
 

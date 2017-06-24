@@ -54,9 +54,14 @@
 #define CMD_EWP                0x5a000003 // Erase page and write page
 #define CMD_EA                 0x5a000005 // Erase all
 #define CMD_SGPB               0x5a00000b // Set GPNVM Bit
+#define CMD_CGPB               0x5a00000c // Clear GPNVM Bit
+#define CMD_GGPB               0x5a00000d // Get GPNVM Bit
 
 #define FLASH_PAGE_SIZE        256
 #define CHIPID_EXID_VALUE      0
+
+#define GPNVM_SIZE             1
+#define GPNVM_SIZE_BITS        8
 
 /*- Types -------------------------------------------------------------------*/
 typedef struct
@@ -248,9 +253,6 @@ static void target_program(void)
 
     verbose(".");
   }
-
-  // Set boot mode GPNVM bit
-  dap_write_word(EEFC_FCR(get_eefc_base(0)), CMD_SGPB | (1 << 8));
 }
 
 //-----------------------------------------------------------------------------
@@ -315,6 +317,101 @@ static void target_read(void)
 }
 
 //-----------------------------------------------------------------------------
+static void target_fuse(void)
+{
+  bool read_all = (-1 == target_options.fuse_start);
+  uint32_t gpnvm;
+  uint8_t *buf = (uint8_t *)&gpnvm;
+  int size = (target_options.fuse_size < GPNVM_SIZE) ?
+      target_options.fuse_size : GPNVM_SIZE;
+
+  dap_write_word(EEFC_FCR(get_eefc_base(0)), CMD_GGPB);
+  while (0 == (dap_read_word(EEFC_FSR(get_eefc_base(0))) & FSR_FRDY));
+  gpnvm = dap_read_word(EEFC_FRR(get_eefc_base(0)));
+
+  if (target_options.fuse_read)
+  {
+    if (target_options.fuse_name)
+    {
+      save_file(target_options.fuse_name, buf, sizeof(gpnvm));
+    }
+    else if (read_all)
+    {
+      message("GPNVM Bits: 0x%02x\n", gpnvm);
+    }
+    else
+    {
+      uint32_t value = extract_value(buf, target_options.fuse_start,
+          target_options.fuse_end);
+
+      message("GPNVM Bits: 0x%02x (%d)\n", value, value);
+    }
+  }
+
+  if (target_options.fuse_write)
+  {
+    if (target_options.fuse_name)
+    {
+      for (int i = 0; i < size; i++)
+        buf[i] = target_options.fuse_data[i];
+    }
+    else
+    {
+      apply_value(buf, target_options.fuse_value, target_options.fuse_start,
+          target_options.fuse_end);
+    }
+
+    for (int i = 0; i < GPNVM_SIZE_BITS; i++)
+    {
+      if (gpnvm & (1 << i))
+        dap_write_word(EEFC_FCR(get_eefc_base(0)), CMD_SGPB | (i << 8));
+      else
+        dap_write_word(EEFC_FCR(get_eefc_base(0)), CMD_CGPB | (i << 8));
+    }
+  }
+
+  if (target_options.fuse_verify)
+  {
+    dap_write_word(EEFC_FCR(get_eefc_base(0)), CMD_GGPB);
+    while (0 == (dap_read_word(EEFC_FSR(get_eefc_base(0))) & FSR_FRDY));
+    gpnvm = dap_read_word(EEFC_FRR(get_eefc_base(0)));
+
+    if (target_options.fuse_name)
+    {
+      for (int i = 0; i < size; i++)
+      {
+        if (target_options.fuse_data[i] != buf[i])
+        {
+          message("fuse byte %d expected 0x%02x, got 0x%02x", i,
+              target_options.fuse_data[i], buf[i]);
+          error_exit("fuse verification failed");
+        }
+      }
+    }
+    else
+    {
+      uint32_t value;
+
+      if (read_all)
+      {
+        value = gpnvm;
+      }
+      else
+      {
+        value = extract_value(buf, target_options.fuse_start,
+          target_options.fuse_end);
+      }
+
+      if (target_options.fuse_value != value)
+      {
+        error_exit("fuse verification failed: expected 0x%x (%u), got 0x%x (%u)",
+            target_options.fuse_value, target_options.fuse_value, value, value);
+      }
+    }
+  }
+}
+
+//-----------------------------------------------------------------------------
 target_ops_t target_atmel_cm3_ops =
 {
   .select   = target_select,
@@ -324,5 +421,6 @@ target_ops_t target_atmel_cm3_ops =
   .program  = target_program,
   .verify   = target_verify,
   .read     = target_read,
+  .fuse     = target_fuse,
 };
 
