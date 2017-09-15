@@ -86,6 +86,9 @@ int dbg_enumerate(debugger_t *debuggers, int size)
       wchar_t wstr[MAX_STRING_SIZE];
       char str[MAX_STRING_SIZE];
 
+      wstr[0] = 0;
+      str[0] = 0;
+
       hid_attr.Size = sizeof(hid_attr);
       HidD_GetAttributes(handle, &hid_attr);
 
