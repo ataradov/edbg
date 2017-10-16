@@ -133,7 +133,7 @@ void message(char *fmt, ...)
 void warning(char *fmt, ...)
 {
   va_list args;
- 
+
   va_start(args, fmt);
   fprintf(stderr, "Warning: ");
   vfprintf(stderr, fmt, args);
@@ -532,6 +532,10 @@ int main(int argc, char **argv)
 
   dbg_open(&debuggers[debugger]);
 
+
+  dap_reset_target();
+
+
   dap_disconnect();
   dap_get_debugger_info();
   dap_connect();
@@ -644,6 +648,7 @@ int main(int argc, char **argv)
 
   target->ops->deselect();
 
+  dap_reset_target_hw();
   dap_disconnect();
   dap_led(0, 0);
 
