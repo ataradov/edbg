@@ -42,7 +42,7 @@ void dap_transfer_configure(uint8_t idle, uint16_t count, uint16_t retry);
 void dap_swd_configure(uint8_t cfg);
 void dap_get_debugger_info(void);
 void dap_reset_target(void);
-void dap_reset_target_hw(void);
+void dap_reset_target_hw(int state);
 uint32_t dap_read_reg(uint8_t reg);
 void dap_write_reg(uint8_t reg, uint32_t data);
 uint32_t dap_read_word(uint32_t addr);
