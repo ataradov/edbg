@@ -1,0 +1,13 @@
+language: c
+
+compiler:
+ - clang
+ - gcc
+
+before_install:
+  - sudo apt-get -y update
+  - sudo apt-get -y install libudev-dev
+
+script:
+  - make all
+
