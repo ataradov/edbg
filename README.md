@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/ataradov/edbg.svg?branch=master)](https://travis-ci.org/ataradov/edbg)
+
 # CMSIS-DAP programmer (Formerly Atmel EDBG programmer)
 
 This is a simple command line utility for programming ARM-based MCUs
