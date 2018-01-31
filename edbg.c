@@ -45,10 +45,9 @@
 #include "dbg.h"
 
 /*- Definitions -------------------------------------------------------------*/
-#define VERSION           "v0.6"
+#define VERSION           "v0.7"
 
 #define MAX_DEBUGGERS     20
-#define DAP_FREQ          16000000 // Hz
 
 #ifndef O_BINARY
 #define O_BINARY 0
@@ -70,18 +69,20 @@ static const struct option long_options[] =
   { "target",    required_argument,  0, 't' },
   { "list",      no_argument,        0, 'l' },
   { "serial",    required_argument,  0, 's' },
+  { "clock",     required_argument,  0, 'c' },
   { "offset",    required_argument,  0, 'o' },
   { "size",      required_argument,  0, 'z' },
   { "fuse",      required_argument,  0, 'F' },
   { 0, 0, 0, 0 }
 };
 
-static const char *short_options = "hbepvkrf:t:ls:o:z:F:";
+static const char *short_options = "hbepvkrf:t:ls:c:o:z:F:";
 
 static char *g_serial = NULL;
 static bool g_list = false;
 static char *g_target = NULL;
 static bool g_verbose = false;
+static long g_clock = 16000000;
 
 static target_options_t g_target_options =
 {
@@ -307,6 +308,25 @@ void apply_value(uint8_t *buf, uint32_t value, int start, int end)
   } while (bit <= end);
 }
 
+//-----------------------------------------------------------------------------
+static void print_clock_freq(int freq)
+{
+  float value = freq;
+  char *unit;
+
+  if (value < 1.0e6)
+  {
+    value /= 1.0e3;
+    unit = "kHz";
+  }
+  else
+  {
+    value /= 1.0e6;
+    unit = "MHz";
+  }
+
+  verbose("Clock frequency: %.1f %s\n", value, unit);
+}
 
 //-----------------------------------------------------------------------------
 static void print_help(char *name, char *param)
@@ -348,8 +368,9 @@ static void print_help(char *name, char *param)
     printf("  -t, --target <name>        specify a target type (use '-t list' for a list of supported target types)\n");
     printf("  -l, --list                 list all available debuggers\n");
     printf("  -s, --serial <number>      use a debugger with a specified serial number\n");
-    printf("  -o, --offset <number>      offset for the operation\n");
-    printf("  -z, --size <number>        size for the operation\n");
+    printf("  -c, --clock <freq>         interface clock frequency in kHz (default 16000)\n");
+    printf("  -o, --offset <offset>      offset for the operation\n");
+    printf("  -z, --size <size>          size for the operation\n");
     printf("  -F, --fuse <options>       operations on the fuses (use '-h fuse' for details)\n");
   }
 
@@ -457,6 +478,7 @@ static void parse_command_line(int argc, char **argv)
       case 't': g_target = optarg; break;
       case 'l': g_list = true; break;
       case 's': g_serial = optarg; break;
+      case 'c': g_clock = strtoul(optarg, NULL, 0) * 1000; break;
       case 'b': g_verbose = true; break;
       case 'o': g_target_options.offset = (uint32_t)strtoul(optarg, NULL, 0); break;
       case 'z': g_target_options.size = (uint32_t)strtoul(optarg, NULL, 0); break;
@@ -541,8 +563,10 @@ int main(int argc, char **argv)
   dap_swd_configure(0);
   dap_led(0, 1);
   dap_reset_link();
-  dap_swj_clock(DAP_FREQ);
+  dap_swj_clock(g_clock);
   dap_target_prepare();
+
+  print_clock_freq(g_clock);
 
   target->ops->select(&g_target_options);
 

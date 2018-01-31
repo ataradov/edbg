@@ -33,11 +33,25 @@ Options:
   -t, --target <name>        specify a target type (use '-t list' for a list of supported target types)
   -l, --list                 list all available debuggers
   -s, --serial <number>      use a debugger with a specified serial number
-  -o, --offset <number>      offset for the operation
-  -z, --size <number>        size for the operation
+  -c, --clock <freq>         interface clock frequency in kHz (default 16000)
+  -o, --offset <offset>      offset for the operation
+  -z, --size <size>          size for the operation
+  -F, --fuse <options>       operations on the fuses (use '-h fuse' for details)
 ```
 
-## Example
+```
+Fuse operations format: <actions>,<index/range>,<value>
+  <actions>     - any combination of 'r' (read), 'w' (write), 'v' (verify)
+  <index/range> - index of the fuse, or a range of fuses (limits separated by ':')
+                  specify ':' to read all fuses
+                  specify '*' to read and write values from a file
+  <value>       - fuses value or file name for write and verify operations
+                  immediate values must be 32 bits or less
+
+Exact fuse bits locations and values are target-dependent.
+```
+
+## Examples
 ```
 > edbg -bpv -t atmel_cm7 -f build/Demo.bin
 Debugger: ATMEL EDBG CMSIS-DAP ATML2407060200000332 02.01.0157 (S)
@@ -47,4 +61,13 @@ Programming....,.. done.
 Verification....... done.
 ```
 
+Fuse operations:
+```
+  -F w,1,1                -- set fuse bit 1
+  -F w,8:7,0              -- clear fuse bits 8 and 7
+  -F v,31:0,0x12345678    -- verify that fuse bits 31-0 are equal to 0x12345678
+  -F wv,5,1               -- set and verify fuse bit 5
+  -F r,:,                 -- read all fuses
+  -F wv,*,fuses.bin       -- write and verify all fuses from a file
+```
 
