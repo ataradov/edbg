@@ -364,7 +364,7 @@ static void print_help(char *name, char *param)
     printf("  -v, --verify               verify memory\n");
     printf("  -k, --lock                 lock the chip (set security bit)\n");
     printf("  -r, --read                 read the whole content of the chip flash\n");
-    printf("  -f, --file <file>          binary file to be programmed or verified\n");
+    printf("  -f, --file <file>          binary file to be programmed or verified; also read output file name\n");
     printf("  -t, --target <name>        specify a target type (use '-t list' for a list of supported target types)\n");
     printf("  -l, --list                 list all available debuggers\n");
     printf("  -s, --serial <number>      use a debugger with a specified serial number\n");

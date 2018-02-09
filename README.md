@@ -31,7 +31,7 @@ Options:
   -v, --verify               verify memory
   -k, --lock                 lock the chip (set security bit)
   -r, --read                 read the contents of the chip
-  -f, --file <file>          binary file to be programmed or verified
+  -f, --file <file>          binary file to be programmed or verified; also read output file name
   -t, --target <name>        specify a target type (use '-t list' for a list of supported target types)
   -l, --list                 list all available debuggers
   -s, --serial <number>      use a debugger with a specified serial number
