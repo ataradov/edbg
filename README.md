@@ -30,7 +30,7 @@ Options:
   -p, --program              program the chip
   -v, --verify               verify memory
   -k, --lock                 lock the chip (set security bit)
-  -r, --read                 read the contents of the chip
+  -r, --read                 read the contents of the chip (use '-f file' to specify output file name)
   -f, --file <file>          binary file to be programmed or verified
   -t, --target <name>        specify a target type (use '-t list' for a list of supported target types)
   -l, --list                 list all available debuggers
