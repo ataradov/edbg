@@ -1,3 +1,7 @@
+ifndef CC
+  CC := gcc
+endif
+
 UNAME := $(shell uname)
 
 SRCS = \
@@ -40,7 +44,7 @@ CFLAGS += -W -Wall -Wextra -O2 -std=gnu11
 all: $(BIN)
 
 $(BIN): $(SRCS) $(HDRS) $(HIDAPI)
-	gcc $(CFLAGS) $(SRCS) $(LIBS) -o $(BIN)
+	$(CC) $(CFLAGS) $(SRCS) $(LIBS) -o $(BIN)
 
 hidapi/mac/.libs/libhidapi.a:
 	git clone git://github.com/signal11/hidapi.git
