@@ -7,6 +7,7 @@ compiler:
 before_install:
   - sudo apt-get -y update
   - sudo apt-get -y install libudev-dev
+  - export COMPILER=$CC
 
 script:
   - make all
