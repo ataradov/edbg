@@ -1,10 +1,5 @@
-ifndef COMPILER
-  COMPILER := gcc
-endif
-
-ifndef UNAME
-  UNAME := $(shell uname)
-endif
+COMPILER ?= gcc
+UNAME ?= $(shell uname)
 
 SRCS = \
   dap.c \
