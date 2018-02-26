@@ -2,7 +2,9 @@ ifndef CC
   CC := gcc
 endif
 
-UNAME := $(shell uname)
+ifndef UNAME
+  UNAME := $(shell uname)
+endif
 
 SRCS = \
   dap.c \
