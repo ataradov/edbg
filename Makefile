@@ -1,4 +1,10 @@
-UNAME := $(shell uname)
+ifndef CC
+  CC := gcc
+endif
+
+ifndef UNAME
+  UNAME := $(shell uname)
+endif
 
 SRCS = \
   dap.c \
@@ -40,13 +46,13 @@ CFLAGS += -W -Wall -Wextra -O2 -std=gnu11
 all: $(BIN)
 
 $(BIN): $(SRCS) $(HDRS) $(HIDAPI)
-	gcc $(CFLAGS) $(SRCS) $(LIBS) -o $(BIN)
+	$(CC) $(CFLAGS) $(SRCS) $(LIBS) -o $(BIN)
 
 hidapi/mac/.libs/libhidapi.a:
 	git clone git://github.com/signal11/hidapi.git
 	cd hidapi && ./bootstrap
 	cd hidapi && ./configure
-	make -Chidapi
+	$(MAKE) -Chidapi
 
 clean:
 	rm -rvf $(BIN) hidapi
