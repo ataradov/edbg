@@ -46,7 +46,7 @@ hidapi/mac/.libs/libhidapi.a:
 	git clone git://github.com/signal11/hidapi.git
 	cd hidapi && ./bootstrap
 	cd hidapi && ./configure
-	make -Chidapi
+	$(MAKE) -Chidapi
 
 clean:
 	rm -rvf $(BIN) hidapi
