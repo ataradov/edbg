@@ -1,14 +1,68 @@
 language: c
 
-compiler:
- - clang
- - gcc
+
+# Currently supported targets
+#
+#  - Linux using Clang
+#  - Linux using GCC
+#  - macOS using Clang
+#  - macOS using GCC
+#  - Windows (amd64) using MXE cross compiler
+matrix:
+ include:
+  - os: linux
+    compiler: clang
+    env: TARGET=LINUX_CLANG
+  - os: linux
+    compiler: gcc
+    env: TARGET=LINUX_GCC
+  - os: osx
+    compiler: clang
+    env: TARGET=OSX_CLANG
+  - os: osx
+    compiler: gcc
+    env: TARGET=OSX_GCC
+  - os: linux
+    compiler: gcc
+    env: TARGET=WINDOWS
+
 
 before_install:
-  - sudo apt-get -y update
-  - sudo apt-get -y install libudev-dev
-  - export COMPILER=$CC
+
+  # Windows
+  # =======
+  #
+  # We are using MXE to build a Windows executable using Travis CI. edbg does
+  # not have any dependencies on Windows besides the Windows Driver Development
+  # Kit which will be provided here.
+  #
+  # @see http://mxe.cc/
+  - if [[ "$TARGET" == "WINDOWS" ]]; then
+
+      git clone --branch=v2.5 --depth=1 https://github.com/uic-evl/omicron.git omicron;
+
+      echo "deb http://pkg.mxe.cc/repos/apt/debian jessie main" | sudo tee /etc/apt/sources.list.d/mxeapt.list;
+      sudo apt-key adv --keyserver x-hkp://keyserver.ubuntu.com --recv-keys D43A795B73B16ABE9643FE1AFD8FFF16DB45C6AB;
+
+      sudo apt-get -y update;
+      sudo apt-get -y install mxe-x86-64-w64-mingw32.static-gcc;
+
+      export CC='/usr/lib/mxe/usr/bin/x86_64-w64-mingw32.static-gcc -Iomicron/external/include';
+      export UNAME=Windows;
+    fi
+
+
+  # Linux
+  # =====
+  #
+  # Installing the libudev-dev dependency is sufficient
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+      sudo apt-get -y update;
+      sudo apt-get -y install libudev-dev;
+    fi
+
 
 script:
+  - export COMPILER=$CC
   - make all
 
