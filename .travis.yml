@@ -66,3 +66,71 @@ script:
   - export COMPILER=$CC
   - make all
 
+
+# If build was successful, binaries will automatically be deployed to bintray.
+#
+# Since we do not want to deploy binaries for pull requests, we have to take
+# environment variables provided by Travis CI into account.
+#
+# We also check the repository slug, since we do not want failed builds for
+# forks. If you want binaries deployed to your bintray account, simply replace
+# the secured bintray credentials below and modify the bintray REST request to
+# match your bintray username, repository and package.
+#
+#
+# Common environment
+# ==================
+#
+# TRAVIS_BUILD_NUMBER		167
+# TRAVIS_COMMIT			b6b90f7d2e8b7fdd4d1a62b59c7822ea160f9491
+# TRAVIS_REPO_SLUG		ataradov/edbg
+# TRAVIS_SECURE_ENV_VARS	true
+#
+#
+# Environment when building master
+# ================================
+# 
+# TRAVIS_BRANCH		master
+# TRAVIS_PULL_REQUEST	false
+#
+#
+# Environment when building a different branch
+# =============================================
+#
+# TRAVIS_BRANCH		feature/automatic-windows-deployment
+# TRAVIS_PULL_REQUEST	false
+#
+#
+# Environment when building a pull request
+# ========================================
+#
+# TRAVIS_BRANCH		master
+# TRAVIS_PULL_REQUEST	104
+env:
+  global:
+    secure: "qMls/WRhfVRCYS8vT6xyHo3tZqcgByV1sm7WtNUPdD9zlw5mh+jxqfdByHz27AfDtibkbkMvgja761rhRskFd2Ajrq2E6aOEQkPF6sGHruEcwF5emY/DhXvFHra6UaUPcCEDBvE6ge0JO4OFs7XgrtX8cGi8yj2AzDDemTX1reXRdpY5AIsyo7bBQpgqukXz0ySWkJeWL4cnKXA0c6WGVFESNw2yxC+0z+EXpuPvfw+OQYyxi/A67HZP0YgONQanMuTHK35t39wlogLB8XhVxMbWEBjbnGAi69pvTDOrlA3VDKe1ojv/vm3lvs53jg2m1sxz+q+F9NNIl0XOG+/8N9pWkWLhZxDC/hxXnKdbN0XJZgXplBw5XQDJ7dgeNzPDnWK9/eBFA1nacbDNElCJ6V+pIG6WV+triwmX2smUeuDKEBfG/v8EX1jx5B/SlEUrFR/8hvmL4UZKcLs/9NyrOSE79SleBMkb9KDH1aESQ00xND9rn5RAoLF8nFu4WKOlkSDwbmqvyV6lj5Q5evK6NDPNLdZ4jjLOOprkUU5mjeFsEUR7uHcjOvRktkC8zIE2bNkcqcqOXiPAANWunmrENnUHsqxb3Vc8yG4wYMClnuZG2ZjBlsSiQVu2WUpwAcDAaguB30xz9+dmNB6Tmp3aDw3zch6raHbEu/cmW2XUupQ="
+
+
+after_success:
+ - if [ "$TRAVIS_SECURE_ENV_VARS" == "true" ] && [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_REPO_SLUG" == "ataradov/edbg" ]; then
+     SOURCE_FILE="edbg";
+
+     BINTRAY_VERSION="${TRAVIS_BUILD_NUMBER}";
+     BINTRAY_DIRECTORY="${TRAVIS_BRANCH}/${BINTRAY_VERSION}";
+     BINTRAY_FILE="edbg-b${TRAVIS_BUILD_NUMBER}-${TARGET}-${TRAVIS_COMMIT:0:7}";
+
+     if [ "$TARGET" == "WINDOWS" ]; then
+       SOURCE_FILE="$SOURCE_FILE.exe";
+       BINTRAY_FILE="$BINTRAY_FILE.exe";
+     fi;
+
+     BINTRAY_RESPONSE=`curl -T "${SOURCE_FILE}" "-uataradov:${BINTRAY_DEPLOYMENT_API_KEY}" "https://api.bintray.com/content/ataradov/edbg/travis-ci/${BINTRAY_VERSION}/${BINTRAY_DIRECTORY}/${BINTRAY_FILE}?publish=1"`;
+
+     if [ '{"message":"success"}' == "${BINTRAY_RESPONSE}" ]; then
+       echo "Artifact published at https://dl.bintray.com/ataradov/edbg/${BINTRAY_DIRECTORY}/${BINTRAY_FILE}";
+     else
+       echo "Depolyment to Bintray failed with response ${BINTRAY_RESPONSE}";
+       exit 1;
+     fi
+   fi
+
