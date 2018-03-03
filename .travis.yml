@@ -124,7 +124,7 @@ after_success:
        BINTRAY_FILE="$BINTRAY_FILE.exe";
      fi;
 
-     BINTRAY_RESPONSE=`curl -T "${SOURCE_FILE}" "-uataradov:${BINTRAY_DEPLOYMENT_API_KEY}" "https://api.bintray.com/content/ataradov/edbg/travis-ci/${BINTRAY_VERSION}/${BINTRAY_DIRECTORY}/${BINTRAY_FILE}?publish=1"`;
+     BINTRAY_RESPONSE=`curl -T "${SOURCE_FILE}" "-uataradov:${BINTRAY_DEPLOYMENT_API_KEY}" "https://api.bintray.com/content/ataradov/edbg/travis-ci/${BINTRAY_VERSION}/${BINTRAY_DIRECTORY}/${BINTRAY_FILE}?publish=1?override=1"`;
 
      if [ '{"message":"success"}' == "${BINTRAY_RESPONSE}" ]; then
        echo "Artifact published at https://dl.bintray.com/ataradov/edbg/${BINTRAY_DIRECTORY}/${BINTRAY_FILE}";
