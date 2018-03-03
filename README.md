@@ -9,7 +9,10 @@ Atmel-ICE, LPC-Link2 and IBDAP.
 
 ## Installation
 
-Simply run `make all` and you will get a small binary, called `edbg`.
+Binary releases can be downloaded [here](https://dl.bintray.com/ataradov/edbg/master/). 
+Binary releases are not tested, they are a result of automated build process.
+
+If you want to build from the source code, simply run `make all` and you will get a small binary, called `edbg`.
 
 ## Dependencies
 
