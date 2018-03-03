@@ -39,6 +39,9 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include "target.h"
 #include "edbg.h"
 #include "dap.h"

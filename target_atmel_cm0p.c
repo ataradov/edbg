@@ -112,7 +112,7 @@ static device_t devices[] =
   { 0x1081020f, "SAM L21J18B (Rev C)", 256*1024, 4096 },
   { 0x1081021e, "SAM R30G18A",         256*1024, 4096 },
   { 0x1081021f, "SAM R30E18A",         256*1024, 4096 },
-  { 0 },
+  { 0, "", 0, 0 },
 };
 
 static device_t target_device;

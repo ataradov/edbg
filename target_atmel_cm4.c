@@ -132,7 +132,7 @@ static device_t devices[] =
   { 0x293b0ae0, 0x00000000, "SAM4N8A (Rev A)",     1,  512*1024 },
   { 0x294b0ae0, 0x00000000, "SAM4N8B (Rev A)",     1,  512*1024 },
   { 0x295b0ae0, 0x00000000, "SAM4N8C (Rev A)",     1,  512*1024 },
-  { 0 },
+  { 0, 0, "", 0, 0 },
 };
 
 static device_t target_device;

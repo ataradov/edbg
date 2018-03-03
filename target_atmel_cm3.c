@@ -96,7 +96,7 @@ static device_t devices[] =
   { 0x281A0761, "ATSAM3U2E", 0x400e0740, 1, {{ 0x400e0800, 0x80000, 128*1024 }} },
   { 0x28190561, "ATSAM3U1E", 0x400e0740, 1, {{ 0x400e0800, 0x80000,  64*1024 }} },
 
-  { 0 },
+  { 0, "", 0, 0, {{ 0, 0, 0 }} },
 };
 
 static device_t target_device;
