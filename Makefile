@@ -36,7 +36,7 @@ else
   endif
 endif
 
-CFLAGS += -W -Wall -Wextra -O2 -std=c11
+CFLAGS += -W -Wall -Wextra -O2 -std=c11 -D_POSIX_C_SOURCE=200809L
 
 all: $(BIN)
 
