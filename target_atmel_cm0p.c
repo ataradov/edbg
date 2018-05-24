@@ -67,6 +67,10 @@
 #define USER_ROW_ADDR          0x00804000
 #define USER_ROW_SIZE          256
 
+#define DEVICE_ID_MASK         0xfffff0ff
+#define DEVICE_REV_SHIFT       8
+#define DEVICE_REV_MASK        0xf
+
 /*- Types -------------------------------------------------------------------*/
 typedef struct
 {
@@ -79,41 +83,30 @@ typedef struct
 /*- Variables ---------------------------------------------------------------*/
 static device_t devices[] =
 {
-  { 0x10040107, "SAM D09C13A",           8*1024,  128 },
-  { 0x10020100, "SAM D10D14AM",         16*1024,  256 },
-  { 0x10030100, "SAM D11D14A",          16*1024,  256 },
-  { 0x10030000, "SAM D11D14AM",         16*1024,  256 },
-  { 0x10030003, "SAM D11D14AS",         16*1024,  256 },
-  { 0x10030006, "SAM D11C14A",          16*1024,  256 },
-  { 0x10030106, "SAM D11C14A (Rev B)",  16*1024,  256 },
-  { 0x10030009, "SAM D11D14AU",         16*1024,  256 },
-  { 0x1000120d, "SAM D20E15A",          32*1024,  512 },
-  { 0x1000140a, "SAM D20E18A",         256*1024, 4096 },
-  { 0x10001100, "SAM D20J18A",         256*1024, 4096 },
-  { 0x10001200, "SAM D20J18A (Rev C)", 256*1024, 4096 },
-  { 0x10001400, "SAM D20J18A (Rev E)", 256*1024, 4096 },
-  { 0x10010100, "SAM D21J18A",         256*1024, 4096 },
-  { 0x10010200, "SAM D21J18A (Rev C)", 256*1024, 4096 },
-  { 0x10010300, "SAM D21J18A (Rev D)", 256*1024, 4096 },
-  { 0x1001020d, "SAM D21E15A (Rev C)",  32*1024,  512 },
-  { 0x1001030a, "SAM D21E18A",         256*1024, 4096 },
-  { 0x10010206, "SAM D21G17A (Rev C)", 128*1024, 2048 },
-  { 0x10010205, "SAM D21G18A",         256*1024, 4096 },
-  { 0x10010305, "SAM D21G18A (Rev D)", 256*1024, 4096 },
-  { 0x10010019, "SAM R21G18 ES",       256*1024, 4096 },
-  { 0x10010119, "SAM R21G18",          256*1024, 4096 },
-  { 0x10010219, "SAM R21G18A (Rev C)", 256*1024, 4096 },
-  { 0x10010319, "SAM R21G18A (Rev D)", 256*1024, 4096 },
-  { 0x1001031c, "SAM R21E18A",         256*1024, 4096 },
-  { 0x11010100, "SAM C21J18A ES",      256*1024, 4096 },
-  { 0x11010300, "SAM C21J18A",         256*1024, 4096 },
-  { 0x11010305, "SAM C21G18A",         256*1024, 4096 },
-  { 0x10810219, "SAM L21E18B",         256*1024, 4096 },
-  { 0x10810000, "SAM L21J18A",         256*1024, 4096 },
-  { 0x1081010f, "SAM L21J18B (Rev B)", 256*1024, 4096 },
-  { 0x1081020f, "SAM L21J18B (Rev C)", 256*1024, 4096 },
-  { 0x1081021e, "SAM R30G18A",         256*1024, 4096 },
-  { 0x1081021f, "SAM R30E18A",         256*1024, 4096 },
+  { 0x10040007, "SAM D09C13A",    8*1024,  128 },
+  { 0x10020000, "SAM D10D14AM",  16*1024,  256 },
+  { 0x10030000, "SAM D11D14A",   16*1024,  256 },
+  { 0x10030000, "SAM D11D14AM",  16*1024,  256 },
+  { 0x10030003, "SAM D11D14AS",  16*1024,  256 },
+  { 0x10030006, "SAM D11C14A",   16*1024,  256 },
+  { 0x10030009, "SAM D11D14AU",  16*1024,  256 },
+  { 0x1000100d, "SAM D20E15A",   32*1024,  512 },
+  { 0x1000100a, "SAM D20E18A",  256*1024, 4096 },
+  { 0x10001000, "SAM D20J18A",  256*1024, 4096 },
+  { 0x1001000d, "SAM D21E15A",   32*1024,  512 },
+  { 0x10010000, "SAM D21J18A",  256*1024, 4096 },
+  { 0x1001000a, "SAM D21E18A",  256*1024, 4096 },
+  { 0x10010006, "SAM D21G17A",  128*1024, 2048 },
+  { 0x10010005, "SAM D21G18A",  256*1024, 4096 },
+  { 0x11010000, "SAM C21J18A",  256*1024, 4096 },
+  { 0x11010005, "SAM C21G18A",  256*1024, 4096 },
+  { 0x10810019, "SAM L21E18B",  256*1024, 4096 },
+  { 0x10810000, "SAM L21J18A",  256*1024, 4096 },
+  { 0x1081000f, "SAM L21J18B",  256*1024, 4096 },
+  { 0x10010019, "SAM R21G18",   256*1024, 4096 },
+  { 0x1001001c, "SAM R21E18A",  256*1024, 4096 },
+  { 0x1081001e, "SAM R30G18A",  256*1024, 4096 },
+  { 0x1081001f, "SAM R30E18A",  256*1024, 4096 },
   { 0, "", 0, 0 },
 };
 
@@ -125,7 +118,7 @@ static target_options_t target_options;
 //-----------------------------------------------------------------------------
 static void target_select(target_options_t *options)
 {
-  uint32_t dsu_did;
+  uint32_t dsu_did, id, rev;
 
   // Stop the core
   dap_write_word(DHCSR, 0xa05f0003);
@@ -133,12 +126,14 @@ static void target_select(target_options_t *options)
   dap_write_word(AIRCR, 0x05fa0004);
 
   dsu_did = dap_read_word(DSU_DID);
+  id = dsu_did & DEVICE_ID_MASK;
+  rev = (dsu_did >> DEVICE_REV_SHIFT) & DEVICE_REV_MASK;
 
   for (device_t *device = devices; device->dsu_did > 0; device++)
   {
-    if (device->dsu_did == dsu_did)
+    if (device->dsu_did == id)
     {
-      verbose("Target: %s\n", device->name);
+      verbose("Target: %s (Rev %c)\n", device->name, 'A' + rev);
 
       target_device = *device;
       target_options = *options;
