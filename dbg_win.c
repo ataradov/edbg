@@ -64,7 +64,7 @@ int dbg_enumerate(debugger_t *debuggers, int size)
 
   dev_info_data.cbSize = sizeof(dev_info_data);
 
-  for (int i = 0; i < size; i++)
+  for (int i = 0; rsize < size; i++)
   {
     if (FALSE == SetupDiEnumDeviceInterfaces(hid_dev_info, 0, &hid_guid, i, &dev_info_data))
       break;
