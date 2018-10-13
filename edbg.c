@@ -48,7 +48,7 @@
 #include "dbg.h"
 
 /*- Definitions -------------------------------------------------------------*/
-#define VERSION           "v0.7"
+#define VERSION           "v0.8"
 
 #define MAX_DEBUGGERS     20
 
