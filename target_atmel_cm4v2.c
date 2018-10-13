@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017, Alex Taradov <alex@taradov.com>
+ * Copyright (c) 2018, Alex Taradov <alex@taradov.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,7 +27,6 @@
  */
 
 /*- Includes ----------------------------------------------------------------*/
-#include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -38,11 +37,13 @@
 
 /*- Definitions -------------------------------------------------------------*/
 #define FLASH_ADDR             0
-#define FLASH_ROW_SIZE         256
-#define FLASH_PAGE_SIZE        64
+#define FLASH_ROW_SIZE         8192
+#define FLASH_PAGE_SIZE        512
+#define PAGES_IN_ERASE_BLOCK   (FLASH_ROW_SIZE / FLASH_PAGE_SIZE)
 
 #define USER_ROW_ADDR          0x00804000
-#define USER_ROW_SIZE          256
+#define USER_ROW_SIZE          512
+#define USER_ROW_PAGE_SIZE     16
 
 #define DHCSR                  0xe000edf0
 #define DEMCR                  0xe000edfc
@@ -51,21 +52,32 @@
 #define DSU_CTRL_STATUS        0x41002100
 #define DSU_DID                0x41002118
 
+#define DSU_CTRL_CE            (1 << 4)
+
+#define DSU_STATUSA_DONE       (1 << 8)
+#define DSU_STATUSB_PROT       (1 << 16)
+
 #define NVMCTRL_CTRLA          0x41004000
 #define NVMCTRL_CTRLB          0x41004004
 #define NVMCTRL_PARAM          0x41004008
-#define NVMCTRL_INTFLAG        0x41004014
-#define NVMCTRL_STATUS         0x41004018
-#define NVMCTRL_ADDR           0x4100401c
+#define NVMCTRL_INTFLAG_STATUS 0x41004010
+#define NVMCTRL_ADDR           0x41004014
 
-#define NVMCTRL_CMD_ER         0xa502
-#define NVMCTRL_CMD_WP         0xa504
-#define NVMCTRL_CMD_EAR        0xa505
-#define NVMCTRL_CMD_WAP        0xa506
-#define NVMCTRL_CMD_WL         0xa50f
-#define NVMCTRL_CMD_UR         0xa541
-#define NVMCTRL_CMD_PBC        0xa544
-#define NVMCTRL_CMD_SSB        0xa545
+#define NVMCTRL_STATUS_READY   (1 << 16)
+
+#define NVMCTRL_CTRLA_AUTOWS     (1 << 2)
+#define NVMCTRL_CTRLA_WMODE_MAN  (0 << 4)
+#define NVMCTRL_CTRLA_PRM_MANUAL (3 << 6)
+#define NVMCTRL_CTRLA_CACHEDIS0  (1 << 14)
+#define NVMCTRL_CTRLA_CACHEDIS1  (1 << 15)
+
+#define NVMCTRL_CMD_EP         0xa500
+#define NVMCTRL_CMD_EB         0xa501
+#define NVMCTRL_CMD_WP         0xa503
+#define NVMCTRL_CMD_WQW        0xa504
+#define NVMCTRL_CMD_UR         0xa512
+#define NVMCTRL_CMD_PBC        0xa515
+#define NVMCTRL_CMD_SSB        0xa516
 
 #define DEVICE_ID_MASK         0xfffff0ff
 #define DEVICE_REV_SHIFT       8
@@ -77,40 +89,13 @@ typedef struct
   uint32_t  dsu_did;
   char      *name;
   uint32_t  flash_size;
-  uint32_t  n_pages;
 } device_t;
 
 /*- Variables ---------------------------------------------------------------*/
 static device_t devices[] =
 {
-  { 0x10040007, "SAM D09C13A",    8*1024,  128 },
-  { 0x10020000, "SAM D10D14AM",  16*1024,  256 },
-  { 0x10030000, "SAM D11D14A",   16*1024,  256 },
-  { 0x10030000, "SAM D11D14AM",  16*1024,  256 },
-  { 0x10030003, "SAM D11D14AS",  16*1024,  256 },
-  { 0x10030006, "SAM D11C14A",   16*1024,  256 },
-  { 0x10030009, "SAM D11D14AU",  16*1024,  256 },
-  { 0x1000100d, "SAM D20E15A",   32*1024,  512 },
-  { 0x1000100a, "SAM D20E18A",  256*1024, 4096 },
-  { 0x10001000, "SAM D20J18A",  256*1024, 4096 },
-  { 0x1001000d, "SAM D21E15A",   32*1024,  512 },
-  { 0x1001000b, "SAM D21E17A",  128*1024, 2048 },
-  { 0x10010000, "SAM D21J18A",  256*1024, 4096 },
-  { 0x1001000a, "SAM D21E18A",  256*1024, 4096 },
-  { 0x10010006, "SAM D21G17A",  128*1024, 2048 },
-  { 0x10010005, "SAM D21G18A",  256*1024, 4096 },
-  { 0x11010000, "SAM C21J18A",  256*1024, 4096 },
-  { 0x11010005, "SAM C21G18A",  256*1024, 4096 },
-  { 0x11011000, "SAM C21N18A",  256*1024, 4096 },
-  { 0x10810019, "SAM L21E18B",  256*1024, 4096 },
-  { 0x10810000, "SAM L21J18A",  256*1024, 4096 },
-  { 0x1081000f, "SAM L21J18B",  256*1024, 4096 },
-  { 0x10820000, "SAM L22N18A",  256*1024, 4096 },
-  { 0x10010019, "SAM R21G18",   256*1024, 4096 },
-  { 0x1001001c, "SAM R21E18A",  256*1024, 4096 },
-  { 0x1081001e, "SAM R30G18A",  256*1024, 4096 },
-  { 0x1081001f, "SAM R30E18A",  256*1024, 4096 },
-  { 0, "", 0, 0 },
+  { 0x61840000, "SAM E54P20A",     1*1024*1024 },
+  { 0 },
 };
 
 static device_t target_device;
@@ -163,10 +148,9 @@ static void target_deselect(void)
 //-----------------------------------------------------------------------------
 static void target_erase(void)
 {
-  dap_write_word(DSU_CTRL_STATUS, 0x00001f00); // Clear flags
-  dap_write_word(DSU_CTRL_STATUS, 0x00000010); // Chip erase
+  dap_write_word(DSU_CTRL_STATUS, DSU_CTRL_CE); // Chip erase
   sleep_ms(100);
-  while (0 == (dap_read_word(DSU_CTRL_STATUS) & 0x00000100));
+  while (0 == (dap_read_word(DSU_CTRL_STATUS) & DSU_STATUSA_DONE));
 }
 
 //-----------------------------------------------------------------------------
@@ -184,27 +168,39 @@ static void target_program(void)
   uint8_t *buf = target_options.file_data;
   uint32_t size = target_options.file_size;
 
-  if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
+  if (dap_read_word(DSU_CTRL_STATUS) & DSU_STATUSB_PROT)
     error_exit("device is locked, perform a chip erase before programming");
+
+  dap_write_word(NVMCTRL_CTRLA, NVMCTRL_CTRLA_AUTOWS | NVMCTRL_CTRLA_WMODE_MAN |
+      NVMCTRL_CTRLA_PRM_MANUAL | NVMCTRL_CTRLA_CACHEDIS0 | NVMCTRL_CTRLA_CACHEDIS1);
 
   number_of_rows = (size + FLASH_ROW_SIZE - 1) / FLASH_ROW_SIZE;
 
-  dap_write_word(NVMCTRL_CTRLB, 0); // Enable automatic write
-
   for (uint32_t row = 0; row < number_of_rows; row++)
   {
-    dap_write_word(NVMCTRL_ADDR, addr >> 1);
+    dap_write_word(NVMCTRL_ADDR, addr);
 
-    dap_write_word(NVMCTRL_CTRLA, NVMCTRL_CMD_UR); // Unlock Region
-    while (0 == (dap_read_word(NVMCTRL_INTFLAG) & 1));
+    dap_write_word(NVMCTRL_CTRLB, NVMCTRL_CMD_UR); // Unlock Region
+    while (0 == (dap_read_word(NVMCTRL_INTFLAG_STATUS) & NVMCTRL_STATUS_READY));
 
-    dap_write_word(NVMCTRL_CTRLA, NVMCTRL_CMD_ER); // Erase Row
-    while (0 == (dap_read_word(NVMCTRL_INTFLAG) & 1));
+    dap_write_word(NVMCTRL_CTRLB, NVMCTRL_CMD_EB);
+    while (0 == (dap_read_word(NVMCTRL_INTFLAG_STATUS) & NVMCTRL_STATUS_READY));
 
-    dap_write_block(addr, &buf[offs], FLASH_ROW_SIZE);
+    for (int page = 0; page < PAGES_IN_ERASE_BLOCK; page++)
+    {
+      dap_write_word(NVMCTRL_ADDR, addr);
 
-    addr += FLASH_ROW_SIZE;
-    offs += FLASH_ROW_SIZE;
+      dap_write_word(NVMCTRL_CTRLB, NVMCTRL_CMD_PBC);
+      while (0 == (dap_read_word(NVMCTRL_INTFLAG_STATUS) & NVMCTRL_STATUS_READY));
+
+      dap_write_block(addr, &buf[offs], FLASH_PAGE_SIZE);
+
+      dap_write_word(NVMCTRL_CTRLB, NVMCTRL_CMD_WP); // Write page
+      while (0 == (dap_read_word(NVMCTRL_INTFLAG_STATUS) & NVMCTRL_STATUS_READY));
+
+      addr += FLASH_PAGE_SIZE;
+      offs += FLASH_PAGE_SIZE;
+    }
 
     verbose(".");
   }
@@ -220,16 +216,13 @@ static void target_verify(void)
   uint8_t *bufa = target_options.file_data;
   uint32_t size = target_options.file_size;
 
-  if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
-    error_exit("device is locked, unable to verify");
-
-  bufb = buf_alloc(FLASH_ROW_SIZE);
+  bufb = buf_alloc(FLASH_PAGE_SIZE);
 
   while (size)
   {
-    dap_read_block(addr, bufb, FLASH_ROW_SIZE);
+    dap_read_block(addr, bufb, FLASH_PAGE_SIZE);
 
-    block_size = (size > FLASH_ROW_SIZE) ? FLASH_ROW_SIZE : size;
+    block_size = (size > FLASH_PAGE_SIZE) ? FLASH_PAGE_SIZE : size;
 
     for (int i = 0; i < (int)block_size; i++)
     {
@@ -242,8 +235,8 @@ static void target_verify(void)
       }
     }
 
-    addr += FLASH_ROW_SIZE;
-    offs += FLASH_ROW_SIZE;
+    addr += FLASH_PAGE_SIZE;
+    offs += FLASH_PAGE_SIZE;
     size -= block_size;
 
     verbose(".");
@@ -260,23 +253,19 @@ static void target_read(void)
   uint8_t *buf = target_options.file_data;
   uint32_t size = target_options.size;
 
-  if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
-    error_exit("device is locked, unable to read");
-
   while (size)
   {
-    dap_read_block(addr, &buf[offs], FLASH_ROW_SIZE);
+    dap_read_block(addr, &buf[offs], FLASH_PAGE_SIZE);
 
-    addr += FLASH_ROW_SIZE;
-    offs += FLASH_ROW_SIZE;
-    size -= FLASH_ROW_SIZE;
+    addr += FLASH_PAGE_SIZE;
+    offs += FLASH_PAGE_SIZE;
+    size -= FLASH_PAGE_SIZE;
 
     verbose(".");
   }
 
   save_file(target_options.name, buf, target_options.size);
 }
-
 
 //-----------------------------------------------------------------------------
 static void target_fuse(void)
@@ -285,6 +274,7 @@ static void target_fuse(void)
   bool read_all = (-1 == target_options.fuse_start);
   int size = (target_options.fuse_size < USER_ROW_SIZE) ?
       target_options.fuse_size : USER_ROW_SIZE;
+  uint32_t addr, offs;
 
   dap_read_block(USER_ROW_ADDR, buf, USER_ROW_SIZE);
 
@@ -325,12 +315,29 @@ static void target_fuse(void)
           target_options.fuse_end);
     }
 
-    dap_write_word(NVMCTRL_CTRLB, 0);
-    dap_write_word(NVMCTRL_ADDR, USER_ROW_ADDR >> 1);
-    dap_write_word(NVMCTRL_CTRLA, NVMCTRL_CMD_EAR);
-    while (0 == (dap_read_word(NVMCTRL_INTFLAG) & 1));
+    dap_write_word(NVMCTRL_ADDR, USER_ROW_ADDR);
 
-    dap_write_block(USER_ROW_ADDR, buf, USER_ROW_SIZE);
+    dap_write_word(NVMCTRL_CTRLB, NVMCTRL_CMD_EP);
+    while (0 == (dap_read_word(NVMCTRL_INTFLAG_STATUS) & NVMCTRL_STATUS_READY));
+
+    dap_write_word(NVMCTRL_CTRLB, NVMCTRL_CMD_PBC);
+    while (0 == (dap_read_word(NVMCTRL_INTFLAG_STATUS) & NVMCTRL_STATUS_READY));
+
+    addr = USER_ROW_ADDR;
+    offs = 0;
+
+    for (int i = 0; i < (USER_ROW_SIZE / USER_ROW_PAGE_SIZE); i++)
+    {
+      dap_write_word(NVMCTRL_ADDR, USER_ROW_ADDR);
+
+      dap_write_block(addr, &buf[offs], USER_ROW_PAGE_SIZE);
+
+      dap_write_word(NVMCTRL_CTRLB, NVMCTRL_CMD_WQW);
+      while (0 == (dap_read_word(NVMCTRL_INTFLAG_STATUS) & NVMCTRL_STATUS_READY));
+
+      addr += USER_ROW_PAGE_SIZE;
+      offs += USER_ROW_PAGE_SIZE;
+    }
   }
 
   if (target_options.fuse_verify)
@@ -368,7 +375,7 @@ static void target_fuse(void)
 }
 
 //-----------------------------------------------------------------------------
-target_ops_t target_atmel_cm0p_ops =
+target_ops_t target_atmel_cm4v2_ops = 
 {
   .select   = target_select,
   .deselect = target_deselect,

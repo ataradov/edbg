@@ -193,7 +193,7 @@ static void target_select(target_options_t *options)
       target_device = *device;
       target_options = *options;
 
-      target_check_options(&target_options, flash_size, FLASH_PAGE_SIZE);
+      target_check_options(&target_options, flash_size, FLASH_PAGE_SIZE, GPNVM_SIZE);
 
       return;
     }

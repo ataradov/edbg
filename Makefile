@@ -8,7 +8,8 @@ SRCS = \
   target_atmel_cm0p.c \
   target_atmel_cm3.c \
   target_atmel_cm4.c \
-  target_atmel_cm7.c
+  target_atmel_cm7.c \
+  target_atmel_cm4v2.c \
 
 HDRS = \
   dap.h \

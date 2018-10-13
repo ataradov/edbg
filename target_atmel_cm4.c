@@ -188,7 +188,7 @@ static void target_select(target_options_t *options)
       target_options = *options;
 
       target_check_options(&target_options, device->flash_size * target_device.n_planes,
-          FLASH_PAGE_SIZE * PAGES_IN_ERASE_BLOCK);
+          FLASH_PAGE_SIZE * PAGES_IN_ERASE_BLOCK, GPNVM_SIZE);
 
       return;
     }

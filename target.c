@@ -36,13 +36,13 @@
 #include "dap.h"
 
 /*- Definitions -------------------------------------------------------------*/
-#define MAX_FUSE_SIZE    256 // Maximum among all targets for now
 
 /*- Variables ---------------------------------------------------------------*/
 extern target_ops_t target_atmel_cm0p_ops;
 extern target_ops_t target_atmel_cm3_ops;
 extern target_ops_t target_atmel_cm4_ops;
 extern target_ops_t target_atmel_cm7_ops;
+extern target_ops_t target_atmel_cm4v2_ops;
 
 static target_t targets[] =
 {
@@ -50,6 +50,7 @@ static target_t targets[] =
   { "atmel_cm3",	"Atmel SAM3X/A series",		&target_atmel_cm3_ops },
   { "atmel_cm4",	"Atmel SAM G and SAM4 series",	&target_atmel_cm4_ops },
   { "atmel_cm7",	"Atmel SAM E7x/S7x/V7x series",	&target_atmel_cm7_ops },
+  { "atmel_cm4v2",	"Atmel SAM D5x/E5x",		&target_atmel_cm4v2_ops },
   { NULL, NULL, NULL },
 };
 
@@ -79,7 +80,7 @@ target_t *target_get_ops(char *name)
 }
 
 //-----------------------------------------------------------------------------
-void target_check_options(target_options_t *options, int size, int align)
+void target_check_options(target_options_t *options, int size, int align, int fuse_size)
 {
   options->file_data = NULL;
   options->file_size = 0;
@@ -115,16 +116,16 @@ void target_check_options(target_options_t *options, int size, int align)
 
   if (options->fuse_name)
   {
-    options->fuse_data = buf_alloc(MAX_FUSE_SIZE);
-    memset(options->fuse_data, 0xff, MAX_FUSE_SIZE);
+    options->fuse_data = buf_alloc(fuse_size);
+    memset(options->fuse_data, 0xff, fuse_size);
 
     if (options->fuse_write || options->fuse_verify)
     {
-      options->fuse_size = load_file(options->fuse_name, options->fuse_data, MAX_FUSE_SIZE);
+      options->fuse_size = load_file(options->fuse_name, options->fuse_data, fuse_size);
     }
     else if (options->fuse_read)
     {
-      options->file_size = MAX_FUSE_SIZE;
+      options->file_size = fuse_size;
     }
   }
 }

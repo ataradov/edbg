@@ -92,7 +92,7 @@ typedef struct
 /*- Prototypes --------------------------------------------------------------*/
 void target_list(void);
 target_t *target_get_ops(char *name);
-void target_check_options(target_options_t *options, int size, int align);
+void target_check_options(target_options_t *options, int size, int align, int fuse_size);
 void target_free_options(target_options_t *options);
 
 #endif // _TARGET_H_
