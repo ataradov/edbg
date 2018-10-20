@@ -31,6 +31,8 @@
 
 /*- Includes ----------------------------------------------------------------*/
 #include <stdarg.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 /*- Prototypes --------------------------------------------------------------*/
 void verbose(char *fmt, ...);
