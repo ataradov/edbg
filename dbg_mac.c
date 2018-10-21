@@ -126,7 +126,7 @@ int dbg_dap_cmd(uint8_t *data, int size, int rsize)
   res = hid_write(handle, hid_buffer, report_size + 1);
   if (res < 0)
   {
-    printf("Error: %ls\n", hid_error(handle));
+    message("Error: %ls\n", hid_error(handle));
     perror_exit("debugger write()");
   }
 

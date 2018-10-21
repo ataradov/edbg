@@ -338,47 +338,51 @@ static void print_clock_freq(int freq)
 //-----------------------------------------------------------------------------
 static void print_help(char *name, char *param)
 {
-  printf("CMSIS-DAP SWD programmer " VERSION ", built " __DATE__ " " __TIME__ " \n\n");
+  message("CMSIS-DAP SWD programmer " VERSION ", built " __DATE__ " " __TIME__ " \n\n");
 
   if (0 == strcmp(param, "fuse"))
   {
-    printf("Fuse operations format: <actions>,<index/range>,<value>\n");
-    printf("  <actions>     - any combination of 'r' (read), 'w' (write), 'v' (verify)\n");
-    printf("  <index/range> - index of the fuse, or a range of fuses (limits separated by ':')\n");
-    printf("                  specify ':' to read all fuses\n");
-    printf("                  specify '*' to read and write values from a file\n");
-    printf("  <value>       - fuses value or file name for write and verify operations\n");
-    printf("                  immediate values must be 32 bits or less\n");
-    printf("\n");
-    printf("Exact fuse bits locations and values are target-dependent.\n");
-    printf("\n");
-    printf("Examples:\n");
-    printf("  -F w,1,1                -- set fuse bit 1\n");
-    printf("  -F w,8:7,0              -- clear fuse bits 8 and 7\n");
-    printf("  -F v,31:0,0x12345678    -- verify that fuse bits 31-0 are equal to 0x12345678\n");
-    printf("  -F wv,5,1               -- set and verify fuse bit 5\n");
-    printf("  -F r,:,                 -- read all fuses\n");
-    printf("  -F wv,*,fuses.bin       -- write and verify all fuses from a file\n");
+    message(
+      "Fuse operations format: <actions>,<index/range>,<value>\n"
+      "  <actions>     - any combination of 'r' (read), 'w' (write), 'v' (verify)\n"
+      "  <index/range> - index of the fuse, or a range of fuses (limits separated by ':')\n"
+      "                  specify ':' to read all fuses\n"
+      "                  specify '*' to read and write values from a file\n"
+      "  <value>       - fuses value or file name for write and verify operations\n"
+      "                  immediate values must be 32 bits or less\n"
+      "\n"
+      "Exact fuse bits locations and values are target-dependent.\n"
+      "\n"
+      "Examples:\n"
+      "  -F w,1,1                -- set fuse bit 1\n"
+      "  -F w,8:7,0              -- clear fuse bits 8 and 7\n"
+      "  -F v,31:0,0x12345678    -- verify that fuse bits 31-0 are equal to 0x12345678\n"
+      "  -F wv,5,1               -- set and verify fuse bit 5\n"
+      "  -F r,:,                 -- read all fuses\n"
+      "  -F wv,*,fuses.bin       -- write and verify all fuses from a file\n"
+    );
   }
   else
   {
-    printf("Usage: %s [options]\n", name);
-    printf("Options:\n");
-    printf("  -h, --help                 print this help message and exit\n");
-    printf("  -b, --verbose              print verbose messages\n");
-    printf("  -e, --erase                perform a chip erase before programming\n");
-    printf("  -p, --program              program the chip\n");
-    printf("  -v, --verify               verify memory\n");
-    printf("  -k, --lock                 lock the chip (set security bit)\n");
-    printf("  -r, --read                 read the whole content of the chip flash\n");
-    printf("  -f, --file <file>          binary file to be programmed or verified; also read output file name\n");
-    printf("  -t, --target <name>        specify a target type (use '-t list' for a list of supported target types)\n");
-    printf("  -l, --list                 list all available debuggers\n");
-    printf("  -s, --serial <number>      use a debugger with a specified serial number\n");
-    printf("  -c, --clock <freq>         interface clock frequency in kHz (default 16000)\n");
-    printf("  -o, --offset <offset>      offset for the operation\n");
-    printf("  -z, --size <size>          size for the operation\n");
-    printf("  -F, --fuse <options>       operations on the fuses (use '-h fuse' for details)\n");
+    message("Usage: %s [options]\n", name);
+    message(
+      "Options:\n"
+      "  -h, --help                 print this help message and exit\n"
+      "  -b, --verbose              print verbose messages\n"
+      "  -e, --erase                perform a chip erase before programming\n"
+      "  -p, --program              program the chip\n"
+      "  -v, --verify               verify memory\n"
+      "  -k, --lock                 lock the chip (set security bit)\n"
+      "  -r, --read                 read the whole content of the chip flash\n"
+      "  -f, --file <file>          binary file to be programmed or verified; also read output file name\n"
+      "  -t, --target <name>        specify a target type (use '-t list' for a list of supported target types)\n"
+      "  -l, --list                 list all available debuggers\n"
+      "  -s, --serial <number>      use a debugger with a specified serial number\n"
+      "  -c, --clock <freq>         interface clock frequency in kHz (default 16000)\n"
+      "  -o, --offset <offset>      offset for the operation\n"
+      "  -z, --size <size>          size for the operation\n"
+      "  -F, --fuse <options>       operations on the fuses (use '-h fuse' for details)\n"
+    );
   }
 
   exit(0);
@@ -520,9 +524,9 @@ int main(int argc, char **argv)
 
   if (g_list)
   {
-    printf("Attached debuggers:\n");
+    message("Attached debuggers:\n");
     for (int i = 0; i < n_debuggers; i++)
-      printf("  %s - %s %s\n", debuggers[i].serial, debuggers[i].manufacturer, debuggers[i].product);
+      message("  %s - %s %s\n", debuggers[i].serial, debuggers[i].manufacturer, debuggers[i].product);
     return 0;
   }
 
