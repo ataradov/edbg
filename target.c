@@ -27,7 +27,6 @@
  */
 
 /*- Includes ----------------------------------------------------------------*/
-#include <stdio.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -59,10 +58,10 @@ static target_t targets[] =
 //-----------------------------------------------------------------------------
 void target_list(void)
 {
-  printf("Supported target types:\n");
+  message("Supported target types:\n");
 
   for (target_t *target = targets; NULL != target->name; target++)
-    printf("  %-16s - %s\n", target->name, target->description);
+    message("  %-16s - %s\n", target->name, target->description);
 }
 
 //-----------------------------------------------------------------------------
