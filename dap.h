@@ -45,13 +45,16 @@ void dap_reset_target(void);
 void dap_reset_target_hw(int state);
 uint32_t dap_read_reg(uint8_t reg);
 void dap_write_reg(uint8_t reg, uint32_t data);
+uint8_t dap_read_byte(uint32_t addr);
+uint16_t dap_read_half(uint32_t addr);
 uint32_t dap_read_word(uint32_t addr);
+void dap_write_byte(uint32_t addr, uint8_t data);
+void dap_write_half(uint32_t addr, uint16_t data);
 void dap_write_word(uint32_t addr, uint32_t data);
 void dap_read_block(uint32_t addr, uint8_t *data, int size);
 void dap_write_block(uint32_t addr, uint8_t *data, int size);
 void dap_reset_link(void);
 uint32_t dap_read_idcode(void);
-void dap_target_prepare(void);
 
 #endif // _DAP_H_
 

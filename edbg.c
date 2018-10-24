@@ -48,7 +48,7 @@
 #include "dbg.h"
 
 /*- Definitions -------------------------------------------------------------*/
-#define VERSION           "v0.8"
+#define VERSION           "v0.9"
 
 #define MAX_DEBUGGERS     20
 
@@ -89,19 +89,20 @@ static long g_clock = 16000000;
 
 static target_options_t g_target_options =
 {
-  .erase       = false,
-  .program     = false,
-  .verify      = false,
-  .lock        = false,
-  .read        = false,
-  .fuse        = false,
-  .fuse_read   = false,
-  .fuse_write  = false,
-  .fuse_verify = false,
-  .fuse_name   = NULL,
-  .name        = NULL,
-  .offset      = -1,
-  .size        = -1,
+  .erase        = false,
+  .program      = false,
+  .verify       = false,
+  .lock         = false,
+  .read         = false,
+  .fuse         = false,
+  .fuse_read    = false,
+  .fuse_write   = false,
+  .fuse_verify  = false,
+  .fuse_section = 0,
+  .fuse_name    = NULL,
+  .name         = NULL,
+  .offset       = -1,
+  .size         = -1,
 };
 
 /*- Implementations ---------------------------------------------------------*/
@@ -336,6 +337,18 @@ static void print_clock_freq(int freq)
 }
 
 //-----------------------------------------------------------------------------
+void reconnect_debugger(void)
+{
+  dap_disconnect();
+  dap_connect();
+  dap_transfer_configure(0, 128, 128);
+  dap_swd_configure(0);
+  dap_led(0, 1);
+  dap_reset_link();
+  dap_swj_clock(g_clock);
+}
+
+//-----------------------------------------------------------------------------
 static void print_help(char *name, char *param)
 {
   message("CMSIS-DAP SWD programmer " VERSION ", built " __DATE__ " " __TIME__ " \n\n");
@@ -343,8 +356,10 @@ static void print_help(char *name, char *param)
   if (0 == strcmp(param, "fuse"))
   {
     message(
-      "Fuse operations format: <actions>,<index/range>,<value>\n"
+      "Fuse operations format: <actions><section>,<index/range>,<value>\n"
       "  <actions>     - any combination of 'r' (read), 'w' (write), 'v' (verify)\n"
+      "  <section>     - index of the fuse section, may be omitted if device has only\n"
+      "                  one section (as most do)\n"
       "  <index/range> - index of the fuse, or a range of fuses (limits separated by ':')\n"
       "                  specify ':' to read all fuses\n"
       "                  specify '*' to read and write values from a file\n"
@@ -410,6 +425,11 @@ static void parse_fuse_options(char *str)
   }
 
   check(g_target_options.fuse, "no fuse operations spefified");
+
+  if (',' != *str)
+  {
+    g_target_options.fuse_section = (uint32_t)strtoul(str, &str, 0);
+  }
 
   if (',' == *str)
   {
@@ -567,15 +587,9 @@ int main(int argc, char **argv)
 
   dap_reset_target_hw(1);
 
-  dap_disconnect();
+  reconnect_debugger();
+
   dap_get_debugger_info();
-  dap_connect();
-  dap_transfer_configure(0, 128, 128);
-  dap_swd_configure(0);
-  dap_led(0, 1);
-  dap_reset_link();
-  dap_swj_clock(g_clock);
-  dap_target_prepare();
 
   print_clock_freq(g_clock);
 
@@ -625,7 +639,7 @@ int main(int argc, char **argv)
       error_exit("mutually exclusive fuse actions specified");
     }
 
-    verbose("Fuse ");
+    verbose("Fuse section %d ", g_target_options.fuse_section);
 
     if (g_target_options.fuse_read)
     {

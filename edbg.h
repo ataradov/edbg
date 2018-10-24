@@ -48,6 +48,7 @@ int load_file(char *name, uint8_t *data, int size);
 void save_file(char *name, uint8_t *data, int size);
 uint32_t extract_value(uint8_t *buf, int start, int end);
 void apply_value(uint8_t *buf, uint32_t value, int start, int end);
+void reconnect_debugger(void);
 
 #endif // _EDBG_H_
 

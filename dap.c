@@ -145,7 +145,49 @@ enum
   SWD_AP_IDR  = 0x0c | DAP_TRANSFER_APnDP, // 0xfc
 };
 
+#define DP_ABORT_DAPABORT      (1 << 0)
+#define DP_ABORT_STKCMPCLR     (1 << 1)
+#define DP_ABORT_STKERRCLR     (1 << 2)
+#define DP_ABORT_WDERRCLR      (1 << 3)
+#define DP_ABORT_ORUNERRCLR    (1 << 4)
+
+#define DP_CST_ORUNDETECT      (1 << 0)
+#define DP_CST_STICKYORUN      (1 << 1)
+#define DP_CST_TRNMODE_NORMAL  (0 << 2)
+#define DP_CST_TRNMODE_VERIFY  (1 << 2)
+#define DP_CST_TRNMODE_COMPARE (2 << 2)
+#define DP_CST_STICKYCMP       (1 << 4)
+#define DP_CST_STICKYERR       (1 << 5)
+#define DP_CST_READOK          (1 << 6)
+#define DP_CST_WDATAERR        (1 << 7)
+#define DP_CST_MASKLANE(x)     ((x) << 8)
+#define DP_CST_TRNCNT(x)       ((x) << 12)
+#define DP_CST_CDBGRSTREQ      (1 << 26)
+#define DP_CST_CDBGRSTACK      (1 << 27)
+#define DP_CST_CDBGPWRUPREQ    (1 << 28)
+#define DP_CST_CDBGPWRUPACK    (1 << 29)
+#define DP_CST_CSYSPWRUPREQ    (1 << 30)
+#define DP_CST_CSYSPWRUPACK    (1 << 31)
+
+#define DP_SELECT_CTRLSEL      (1 << 0)
+#define DP_SELECT_APBANKSEL(x) ((x) << 4)
+#define DP_SELECT_APSEL(x)     ((x) << 24)
+
+#define AP_CSW_SIZE_BYTE       (0 << 0)
+#define AP_CSW_SIZE_HALF       (1 << 0)
+#define AP_CSW_SIZE_WORD       (2 << 0)
+#define AP_CSW_ADDRINC_OFF     (0 << 4)
+#define AP_CSW_ADDRINC_SINGLE  (1 << 4)
+#define AP_CSW_ADDRINC_PACKED  (2 << 4)
+#define AP_CSW_DEVICEEN        (1 << 6)
+#define AP_CSW_TRINPROG        (1 << 7)
+#define AP_CSW_SPIDEN          (1 << 23)
+#define AP_CSW_PROT(x)         ((x) << 24)
+#define AP_CSW_DBGSWENABLE     (1 << 31)
+
 /*- Variables ---------------------------------------------------------------*/
+static bool dap_is_prepared = false;
+static int dap_transfer_size = AP_CSW_SIZE_WORD;
 
 /*- Implementations ---------------------------------------------------------*/
 
@@ -357,15 +399,81 @@ void dap_write_reg(uint8_t reg, uint32_t data)
 }
 
 //-----------------------------------------------------------------------------
+static void dap_set_transfer_size(int size)
+{
+  uint32_t csw = AP_CSW_ADDRINC_SINGLE | AP_CSW_DEVICEEN | AP_CSW_PROT(0x23);
+
+  if (!dap_is_prepared)
+  {
+    dap_write_reg(SWD_DP_W_ABORT, DP_ABORT_STKCMPCLR | DP_ABORT_STKERRCLR | DP_ABORT_ORUNERRCLR);
+    dap_write_reg(SWD_DP_W_SELECT, DP_SELECT_APBANKSEL(0) | DP_SELECT_APSEL(0));
+    dap_write_reg(SWD_DP_W_CTRL_STAT, DP_CST_CDBGPWRUPREQ | DP_CST_CSYSPWRUPREQ | DP_CST_MASKLANE(0xf));
+
+    dap_write_reg(SWD_AP_CSW, csw | AP_CSW_SIZE_WORD);
+
+    dap_transfer_size = AP_CSW_SIZE_WORD;
+    dap_is_prepared = true;
+  }
+
+  if (dap_transfer_size != size)
+  {
+    dap_write_reg(SWD_AP_CSW, csw | size);
+    dap_transfer_size = size;
+  }
+}
+
+//-----------------------------------------------------------------------------
+uint8_t dap_read_byte(uint32_t addr)
+{
+  uint32_t data;
+
+  dap_set_transfer_size(AP_CSW_SIZE_BYTE);
+  dap_write_reg(SWD_AP_TAR, addr);
+  data = dap_read_reg(SWD_AP_DRW);
+
+  return (data >> ((addr & 3) * 8)) & 0xff;
+}
+
+//-----------------------------------------------------------------------------
+uint16_t dap_read_half(uint32_t addr)
+{
+  uint32_t data;
+
+  dap_set_transfer_size(AP_CSW_SIZE_HALF);
+  dap_write_reg(SWD_AP_TAR, addr);
+  data = dap_read_reg(SWD_AP_DRW);
+
+  return (data >> ((addr & 2) * 8)) & 0xffff;
+}
+
+//-----------------------------------------------------------------------------
 uint32_t dap_read_word(uint32_t addr)
 {
+  dap_set_transfer_size(AP_CSW_SIZE_WORD);
   dap_write_reg(SWD_AP_TAR, addr);
   return dap_read_reg(SWD_AP_DRW);
 }
 
 //-----------------------------------------------------------------------------
+void dap_write_byte(uint32_t addr, uint8_t data)
+{
+  dap_set_transfer_size(AP_CSW_SIZE_BYTE);
+  dap_write_reg(SWD_AP_TAR, addr);
+  dap_write_reg(SWD_AP_DRW, (uint32_t)data << ((addr & 3) * 8));
+}
+
+//-----------------------------------------------------------------------------
+void dap_write_half(uint32_t addr, uint16_t data)
+{
+  dap_set_transfer_size(AP_CSW_SIZE_HALF);
+  dap_write_reg(SWD_AP_TAR, addr);
+  dap_write_reg(SWD_AP_DRW, (uint32_t)data << ((addr & 2) * 8));
+}
+
+//-----------------------------------------------------------------------------
 void dap_write_word(uint32_t addr, uint32_t data)
 {
+  dap_set_transfer_size(AP_CSW_SIZE_WORD);
   dap_write_reg(SWD_AP_TAR, addr);
   dap_write_reg(SWD_AP_DRW, data);
 }
@@ -375,6 +483,8 @@ void dap_read_block(uint32_t addr, uint8_t *data, int size)
 {
   int max_size = (dbg_get_report_size() - 5) & ~3;
   int offs = 0;
+
+  dap_set_transfer_size(AP_CSW_SIZE_WORD);
 
   while (size)
   {
@@ -413,6 +523,8 @@ void dap_write_block(uint32_t addr, uint8_t *data, int size)
 {
   int max_size = (dbg_get_report_size() - 5) & ~3;
   int offs = 0;
+
+  dap_set_transfer_size(AP_CSW_SIZE_WORD);
 
   while (size)
   {
@@ -480,20 +592,13 @@ void dap_reset_link(void)
   buf[2] = 1; // Request size
   buf[3] = SWD_DP_R_IDCODE | DAP_TRANSFER_RnW;
   dbg_dap_cmd(buf, sizeof(buf), 4);
+
+  dap_is_prepared = false;
 }
 
 //-----------------------------------------------------------------------------
 uint32_t dap_read_idcode(void)
 {
   return dap_read_reg(SWD_DP_R_IDCODE);
-}
-
-//-----------------------------------------------------------------------------
-void dap_target_prepare(void)
-{
-  dap_write_reg(SWD_DP_W_ABORT, 0x00000016);
-  dap_write_reg(SWD_DP_W_SELECT, 0x00000000);
-  dap_write_reg(SWD_DP_W_CTRL_STAT, 0x50000f00);
-  dap_write_reg(SWD_AP_CSW, 0x23000052);
 }
 

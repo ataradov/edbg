@@ -332,6 +332,9 @@ static void target_fuse(void)
   int size = (target_options.fuse_size < GPNVM_SIZE) ?
       target_options.fuse_size : GPNVM_SIZE;
 
+  check(0 == target_options.fuse_section, "unsupported fuse section %d",
+      target_options.fuse_section);
+
   dap_write_word(EEFC_FCR(0), CMD_GGPB);
   while (0 == (dap_read_word(EEFC_FSR(0)) & FSR_FRDY));
   gpnvm = dap_read_word(EEFC_FRR(0));

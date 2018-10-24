@@ -277,6 +277,9 @@ static void target_fuse(void)
       target_options.fuse_size : USER_ROW_SIZE;
   uint32_t addr, offs;
 
+  check(0 == target_options.fuse_section, "unsupported fuse section %d",
+      target_options.fuse_section);
+
   dap_read_block(USER_ROW_ADDR, buf, USER_ROW_SIZE);
 
   if (target_options.fuse_read)

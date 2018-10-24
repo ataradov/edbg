@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017, Alex Taradov <alex@taradov.com>
+ * Copyright (c) 2018, Alex Taradov <alex@taradov.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,90 +42,190 @@
 #define FLASH_PAGE_SIZE        64
 
 #define USER_ROW_ADDR          0x00804000
-#define USER_ROW_SIZE          256
+#define BOCOR_ROW_ADDR         0x0080c000
 
 #define DHCSR                  0xe000edf0
 #define DEMCR                  0xe000edfc
 #define AIRCR                  0xe000ed0c
 
-#define DSU_CTRL_STATUS        0x41002100
-#define DSU_DID                0x41002118
+#define DSU_CTRL               0x41002100
+#define DSU_STATUSA            0x41002101
+#define DSU_STATUSB            0x41002102
 
-#define NVMCTRL_CTRLA          0x41004000
-#define NVMCTRL_CTRLB          0x41004004
-#define NVMCTRL_PARAM          0x41004008
-#define NVMCTRL_INTFLAG        0x41004014
-#define NVMCTRL_STATUS         0x41004018
-#define NVMCTRL_ADDR           0x4100401c
+#define DSU_DID                0x41002118
+#define DSU_BCC0               0x41002120
+#define DSU_BCC1               0x41002124
+
+#define DSU_STATUSA_CRSTEXT    (1 << 1)
+#define DSU_STATUSA_BREXT      (1 << 5)
+
+#define DSU_STATUSB_BCCD0      (1 << 6)
+#define DSU_STATUSB_BCCD1      (1 << 7)
+
+#define NVMCTRL_NSEC_CTRLA     0x41004000
+#define NVMCTRL_NSEC_CTRLB     0x41004004
+#define NVMCTRL_NSEC_CTRLC     0x41004008
+#define NVMCTRL_NSEC_STATUS    0x41004018
+#define NVMCTRL_NSEC_ADDR      0x4100401c
+
+#define NVMCTRL_SEC_OFFSET     0x1000
+
+#define NVMCTRL_STATUS_READY   (1 << 2)
+#define NVMCTRL_STATUS_DAL0    (1 << 3)
+#define NVMCTRL_STATUS_DAL1    (1 << 4)
 
 #define NVMCTRL_CMD_ER         0xa502
 #define NVMCTRL_CMD_WP         0xa504
-#define NVMCTRL_CMD_EAR        0xa505
-#define NVMCTRL_CMD_WAP        0xa506
-#define NVMCTRL_CMD_WL         0xa50f
-#define NVMCTRL_CMD_UR         0xa541
-#define NVMCTRL_CMD_PBC        0xa544
-#define NVMCTRL_CMD_SSB        0xa545
+#define NVMCTRL_CMD_SDAL0      0xa54b
 
 #define DEVICE_ID_MASK         0xfffff0ff
 #define DEVICE_REV_SHIFT       8
 #define DEVICE_REV_MASK        0xf
 
+#define CMD_PREFIX             0x44424700
+#define SIG_PREFIX             0xec000000
+
+enum
+{
+  CMD_INIT      = 0x55,
+  CMD_EXIT      = 0xaa,
+  CMD_RESET     = 0x52,
+  CMD_CE0       = 0xe0,
+  CMD_CE1       = 0xe1,
+  CMD_CE2       = 0xe2,
+  CMD_CHIPERASE = 0xe3,
+  CMD_CRC       = 0xc0,
+  CMD_DCEK      = 0x44,
+  CMD_RAUX      = 0x4c,
+};
+
+enum
+{
+  SIG_NO          = 0x00,
+  SIG_COMM        = 0x20,
+  SIG_CMD_SUCCESS = 0x21,
+  SIG_CMD_VALID   = 0x24,
+  SIG_BOOTOK      = 0x39,
+};
+
 /*- Types -------------------------------------------------------------------*/
+typedef struct
+{
+  uint32_t  CTRLA;
+  uint32_t  CTRLB;
+  uint32_t  CTRLC;
+  uint32_t  STATUS;
+  uint32_t  ADDR;
+} nvmctrl_t;
+
 typedef struct
 {
   uint32_t  dsu_did;
   char      *name;
   uint32_t  flash_size;
+  bool      trust_zone;
 } device_t;
 
 /*- Variables ---------------------------------------------------------------*/
 static device_t devices[] =
 {
-  { 0x10040007, "SAM D09C13A",    8*1024 },
-  { 0x10020000, "SAM D10D14AM",  16*1024 },
-  { 0x10030000, "SAM D11D14A",   16*1024 },
-  { 0x10030000, "SAM D11D14AM",  16*1024 },
-  { 0x10030003, "SAM D11D14AS",  16*1024 },
-  { 0x10030006, "SAM D11C14A",   16*1024 },
-  { 0x10030009, "SAM D11D14AU",  16*1024 },
-  { 0x1000100d, "SAM D20E15A",   32*1024 },
-  { 0x1000100a, "SAM D20E18A",  256*1024 },
-  { 0x10001000, "SAM D20J18A",  256*1024 },
-  { 0x1001000d, "SAM D21E15A",   32*1024 },
-  { 0x1001000b, "SAM D21E17A",  128*1024 },
-  { 0x10010000, "SAM D21J18A",  256*1024 },
-  { 0x1001000a, "SAM D21E18A",  256*1024 },
-  { 0x10010006, "SAM D21G17A",  128*1024 },
-  { 0x10010005, "SAM D21G18A",  256*1024 },
-  { 0x11010000, "SAM C21J18A",  256*1024 },
-  { 0x11010005, "SAM C21G18A",  256*1024 },
-  { 0x11011000, "SAM C21N18A",  256*1024 },
-  { 0x10810019, "SAM L21E18B",  256*1024 },
-  { 0x10810000, "SAM L21J18A",  256*1024 },
-  { 0x1081000f, "SAM L21J18B",  256*1024 },
-  { 0x10820000, "SAM L22N18A",  256*1024 },
-  { 0x10010019, "SAM R21G18",   256*1024 },
-  { 0x1001001c, "SAM R21E18A",  256*1024 },
-  { 0x1081001e, "SAM R30G18A",  256*1024 },
-  { 0x1081001f, "SAM R30E18A",  256*1024 },
+  { 0x20840000, "SAM L10E16A",  64*1024, false },
+  { 0x20830000, "SAM L11E16A",  64*1024, true  },
   { 0 },
 };
 
 static device_t target_device;
 static target_options_t target_options;
 
+static uint32_t NVMCTRL_CTRLA;
+static uint32_t NVMCTRL_CTRLB;
+static uint32_t NVMCTRL_CTRLC;
+static uint32_t NVMCTRL_STATUS;
+static uint32_t NVMCTRL_ADDR;
+
 /*- Implementations ---------------------------------------------------------*/
+
+//-----------------------------------------------------------------------------
+static void reset_with_extension(void)
+{
+  dap_reset_target_hw(0);
+
+  reconnect_debugger();
+
+  dap_write_byte(DSU_STATUSA, DSU_STATUSA_CRSTEXT);
+}
+
+//-----------------------------------------------------------------------------
+static void bootrom_data(uint32_t data)
+{
+  dap_write_word(DSU_BCC0, data);
+  while (dap_read_byte(DSU_STATUSB) & DSU_STATUSB_BCCD0);
+}
+
+//-----------------------------------------------------------------------------
+static void bootrom_command(int cmd)
+{
+  dap_write_word(DSU_BCC0, CMD_PREFIX | cmd);
+  while (dap_read_byte(DSU_STATUSB) & DSU_STATUSB_BCCD0);
+}
+
+//-----------------------------------------------------------------------------
+static int bootrom_expect(int status)
+{
+  uint32_t v;
+  int i, res;
+
+  for (i = 1000; i > 0; i--)
+  {
+    if (dap_read_byte(DSU_STATUSB) & DSU_STATUSB_BCCD1)
+      break;
+  }
+
+  if (0 == i)
+    error_exit("no BootROM response");
+
+  v = dap_read_word(DSU_BCC1);
+
+  if (SIG_PREFIX != (v & 0xffffff00))
+    error_exit("invalid BootROM response prefix 0x%08x", v);
+
+  res = v & 0xff;
+
+  if (status != -1 && status != res)
+    error_exit("invalid BootROM response 0x%02x, expected 0x%02x", res, status);
+
+  return res;
+}
+
+//-----------------------------------------------------------------------------
+static void bootrom_park(void)
+{
+  static bool in_park_mode = false;
+  int response;
+
+  if (!in_park_mode)
+  {
+    reset_with_extension();
+
+    bootrom_command(CMD_EXIT);
+    response = bootrom_expect(-1);
+
+    if (SIG_BOOTOK != response)
+    {
+      error_exit("invalid BootROM response 0x%02x, expected 0x%02x. Check that device is not locked.",
+          response, SIG_BOOTOK);
+    }
+
+    in_park_mode = true;
+  }
+}
 
 //-----------------------------------------------------------------------------
 static void target_select(target_options_t *options)
 {
   uint32_t dsu_did, id, rev;
 
-  // Stop the core
-  dap_write_word(DHCSR, 0xa05f0003);
-  dap_write_word(DEMCR, 0x00000001);
-  dap_write_word(AIRCR, 0x05fa0004);
+  reset_with_extension();
 
   dsu_did = dap_read_word(DSU_DID);
   id = dsu_did & DEVICE_ID_MASK;
@@ -140,8 +240,25 @@ static void target_select(target_options_t *options)
       target_device = *device;
       target_options = *options;
 
+      if (target_device.trust_zone)
+      {
+        NVMCTRL_CTRLA  = NVMCTRL_NSEC_CTRLA + NVMCTRL_SEC_OFFSET;
+        NVMCTRL_CTRLB  = NVMCTRL_NSEC_CTRLB + NVMCTRL_SEC_OFFSET;
+        NVMCTRL_CTRLC  = NVMCTRL_NSEC_CTRLC + NVMCTRL_SEC_OFFSET;
+        NVMCTRL_STATUS = NVMCTRL_NSEC_STATUS + NVMCTRL_SEC_OFFSET;
+        NVMCTRL_ADDR   = NVMCTRL_NSEC_ADDR + NVMCTRL_SEC_OFFSET;
+      }
+      else
+      {
+        NVMCTRL_CTRLA  = NVMCTRL_NSEC_CTRLA;
+        NVMCTRL_CTRLB  = NVMCTRL_NSEC_CTRLB;
+        NVMCTRL_CTRLC  = NVMCTRL_NSEC_CTRLC;
+        NVMCTRL_STATUS = NVMCTRL_NSEC_STATUS;
+        NVMCTRL_ADDR   = NVMCTRL_NSEC_ADDR;
+      }
+
       target_check_options(&target_options, device->flash_size,
-          FLASH_ROW_SIZE, USER_ROW_SIZE);
+          FLASH_ROW_SIZE, FLASH_ROW_SIZE);
 
       return;
     }
@@ -153,25 +270,50 @@ static void target_select(target_options_t *options)
 //-----------------------------------------------------------------------------
 static void target_deselect(void)
 {
-  dap_write_word(DEMCR, 0x00000000);
-  dap_write_word(AIRCR, 0x05fa0004);
-
   target_free_options(&target_options);
 }
 
 //-----------------------------------------------------------------------------
 static void target_erase(void)
 {
-  dap_write_word(DSU_CTRL_STATUS, 0x00001f00); // Clear flags
-  dap_write_word(DSU_CTRL_STATUS, 0x00000010); // Chip erase
-  sleep_ms(100);
-  while (0 == (dap_read_word(DSU_CTRL_STATUS) & 0x00000100));
+  uint32_t status = dap_read_word(DSU_BCC1);
+
+  reset_with_extension();
+
+  status = dap_read_word(DSU_BCC1);
+
+  check(status == (SIG_PREFIX | SIG_BOOTOK), "BootROM indicated an error (STATUS = 0x%08x)");
+
+  bootrom_command(CMD_INIT);
+  bootrom_expect(SIG_COMM);
+
+  if (target_device.trust_zone)
+  {
+    bootrom_command(CMD_CE2);
+    bootrom_expect(SIG_CMD_VALID);
+
+    // TODO: Take this value from a command line argument
+    bootrom_data(0xffffffff);
+    bootrom_data(0xffffffff);
+    bootrom_data(0xffffffff);
+    bootrom_data(0xffffffff);
+  }
+  else
+  {
+    bootrom_command(CMD_CHIPERASE);
+    bootrom_expect(SIG_CMD_VALID);
+  }
+
+  bootrom_expect(SIG_CMD_SUCCESS);
 }
 
 //-----------------------------------------------------------------------------
 static void target_lock(void)
 {
-  dap_write_word(NVMCTRL_CTRLA, NVMCTRL_CMD_SSB); // Set Security Bit
+  bootrom_park();
+
+  dap_write_half(NVMCTRL_CTRLA, NVMCTRL_CMD_SDAL0);
+  while (0 == (dap_read_byte(NVMCTRL_STATUS) & NVMCTRL_STATUS_READY));
 }
 
 //-----------------------------------------------------------------------------
@@ -183,22 +325,21 @@ static void target_program(void)
   uint8_t *buf = target_options.file_data;
   uint32_t size = target_options.file_size;
 
-  if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
-    error_exit("device is locked, perform a chip erase before programming");
+  bootrom_park();
+
+  if ((dap_read_byte(DSU_STATUSB) & 0x03) != 0x02)
+    error_exit("device is locked (DAL is not 2), perform a chip erase before programming");
 
   number_of_rows = (size + FLASH_ROW_SIZE - 1) / FLASH_ROW_SIZE;
 
-  dap_write_word(NVMCTRL_CTRLB, 0); // Enable automatic write
+  dap_write_byte(NVMCTRL_CTRLC, 0); // Enable automatic write
 
   for (uint32_t row = 0; row < number_of_rows; row++)
   {
-    dap_write_word(NVMCTRL_ADDR, addr >> 1);
+    dap_write_word(NVMCTRL_ADDR, addr);
 
-    dap_write_word(NVMCTRL_CTRLA, NVMCTRL_CMD_UR); // Unlock Region
-    while (0 == (dap_read_word(NVMCTRL_INTFLAG) & 1));
-
-    dap_write_word(NVMCTRL_CTRLA, NVMCTRL_CMD_ER); // Erase Row
-    while (0 == (dap_read_word(NVMCTRL_INTFLAG) & 1));
+    dap_write_half(NVMCTRL_CTRLA, NVMCTRL_CMD_ER);
+    while (0 == (dap_read_byte(NVMCTRL_STATUS) & NVMCTRL_STATUS_READY));
 
     dap_write_block(addr, &buf[offs], FLASH_ROW_SIZE);
 
@@ -219,8 +360,10 @@ static void target_verify(void)
   uint8_t *bufa = target_options.file_data;
   uint32_t size = target_options.file_size;
 
-  if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
-    error_exit("device is locked, unable to verify");
+  bootrom_park();
+
+  if ((dap_read_byte(DSU_STATUSB) & 0x03) != 0x02)
+    error_exit("device is locked (DAL is not 2), unable to verify");
 
   bufb = buf_alloc(FLASH_ROW_SIZE);
 
@@ -259,8 +402,10 @@ static void target_read(void)
   uint8_t *buf = target_options.file_data;
   uint32_t size = target_options.size;
 
-  if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
-    error_exit("device is locked, unable to read");
+  bootrom_park();
+
+  if ((dap_read_byte(DSU_STATUSB) & 0x03) != 0x02)
+    error_exit("device is locked (DAL is not 2), unable to read");
 
   while (size)
   {
@@ -276,31 +421,37 @@ static void target_read(void)
   save_file(target_options.name, buf, target_options.size);
 }
 
-
 //-----------------------------------------------------------------------------
 static void target_fuse(void)
 {
-  uint8_t buf[USER_ROW_SIZE];
+  uint8_t buf[FLASH_ROW_SIZE];
   bool read_all = (-1 == target_options.fuse_start);
-  int size = (target_options.fuse_size < USER_ROW_SIZE) ?
-      target_options.fuse_size : USER_ROW_SIZE;
+  int size = (target_options.fuse_size < FLASH_ROW_SIZE) ?
+      target_options.fuse_size : FLASH_ROW_SIZE;
+  uint32_t addr = 0;
 
-  check(0 == target_options.fuse_section, "unsupported fuse section %d",
-      target_options.fuse_section);
+  if (0 == target_options.fuse_section)
+    addr = USER_ROW_ADDR;
+  else if (1 == target_options.fuse_section)
+    addr = BOCOR_ROW_ADDR;
+  else
+    error_exit("unsupported fuse section %d", target_options.fuse_section);
 
-  dap_read_block(USER_ROW_ADDR, buf, USER_ROW_SIZE);
+  bootrom_park();
+
+  dap_read_block(addr, buf, FLASH_ROW_SIZE);
 
   if (target_options.fuse_read)
   {
     if (target_options.fuse_name)
     {
-      save_file(target_options.fuse_name, buf, USER_ROW_SIZE);
+      save_file(target_options.fuse_name, buf, FLASH_ROW_SIZE);
     }
     else if (read_all)
     {
-      message("Fuses (user row): ");
+      message("Fuses: ");
 
-      for (int i = 0; i < USER_ROW_SIZE; i++)
+      for (int i = 0; i < FLASH_ROW_SIZE; i++)
         message("%02x ", buf[i]);
 
       message("\n");
@@ -327,17 +478,17 @@ static void target_fuse(void)
           target_options.fuse_end);
     }
 
-    dap_write_word(NVMCTRL_CTRLB, 0);
-    dap_write_word(NVMCTRL_ADDR, USER_ROW_ADDR >> 1);
-    dap_write_word(NVMCTRL_CTRLA, NVMCTRL_CMD_EAR);
-    while (0 == (dap_read_word(NVMCTRL_INTFLAG) & 1));
+    dap_write_byte(NVMCTRL_CTRLC, 0);
+    dap_write_word(NVMCTRL_ADDR, addr);
+    dap_write_half(NVMCTRL_CTRLA, NVMCTRL_CMD_ER);
+    while (0 == (dap_read_byte(NVMCTRL_STATUS) & NVMCTRL_STATUS_READY));
 
-    dap_write_block(USER_ROW_ADDR, buf, USER_ROW_SIZE);
+    dap_write_block(addr, buf, FLASH_ROW_SIZE);
   }
 
   if (target_options.fuse_verify)
   {
-    dap_read_block(USER_ROW_ADDR, buf, USER_ROW_SIZE);
+    dap_read_block(addr, buf, FLASH_ROW_SIZE);
 
     if (target_options.fuse_name)
     {
@@ -370,7 +521,7 @@ static void target_fuse(void)
 }
 
 //-----------------------------------------------------------------------------
-target_ops_t target_atmel_cm0p_ops =
+target_ops_t target_mchp_cm23_ops =
 {
   .select   = target_select,
   .deselect = target_deselect,

@@ -54,6 +54,7 @@ typedef struct
   bool         fuse_read;
   bool         fuse_write;
   bool         fuse_verify;
+  int          fuse_section;
   int          fuse_start;
   int          fuse_end;
   uint32_t     fuse_value;
