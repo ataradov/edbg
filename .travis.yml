@@ -22,9 +22,9 @@ matrix:
   - os: osx
     compiler: gcc
     env: TARGET=OSX_GCC
-  - os: linux
-    compiler: gcc
-    env: TARGET=WINDOWS
+#  - os: linux
+#    compiler: gcc
+#    env: TARGET=WINDOWS
 
 
 before_install:
