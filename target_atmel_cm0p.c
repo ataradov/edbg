@@ -44,12 +44,15 @@
 #define USER_ROW_ADDR          0x00804000
 #define USER_ROW_SIZE          256
 
-#define DHCSR                  0xe000edf0
-#define DEMCR                  0xe000edfc
-#define AIRCR                  0xe000ed0c
-
-#define DSU_CTRL_STATUS        0x41002100
+#define DSU_CTRL               0x41002100
+#define DSU_STATUSA            0x41002101
+#define DSU_STATUSB            0x41002102
 #define DSU_DID                0x41002118
+
+#define DSU_CTRL_CE            (1 << 4)
+#define DSU_STATUSA_DONE       (1 << 0)
+#define DSU_STATUSA_CRSTEXT    (1 << 1)
+#define DSU_STATUSB_PROT       (1 << 0)
 
 #define NVMCTRL_CTRLA          0x41004000
 #define NVMCTRL_CTRLB          0x41004004
@@ -57,6 +60,8 @@
 #define NVMCTRL_INTFLAG        0x41004014
 #define NVMCTRL_STATUS         0x41004018
 #define NVMCTRL_ADDR           0x4100401c
+
+#define NVMCTRL_INTFLAG_READY  (1 << 0)
 
 #define NVMCTRL_CMD_ER         0xa502
 #define NVMCTRL_CMD_WP         0xa504
@@ -122,15 +127,19 @@ static target_options_t target_options;
 static void target_select(target_options_t *options)
 {
   uint32_t dsu_did, id, rev;
+  bool restricted;
 
-  // Stop the core
-  dap_write_word(DHCSR, 0xa05f0003);
-  dap_write_word(DEMCR, 0x00000001);
-  dap_write_word(AIRCR, 0x05fa0004);
+  // Enter reset extension mode
+  dap_reset_target_hw(0);
+  sleep_ms(10);
+  reconnect_debugger();
 
   dsu_did = dap_read_word(DSU_DID);
   id = dsu_did & DEVICE_ID_MASK;
   rev = (dsu_did >> DEVICE_REV_SHIFT) & DEVICE_REV_MASK;
+
+  restricted = options->program || options->verify || options->read ||
+               options->lock || options->fuse;
 
   for (device_t *device = devices; device->dsu_did > 0; device++)
   {
@@ -144,6 +153,9 @@ static void target_select(target_options_t *options)
       target_check_options(&target_options, device->flash_size,
           FLASH_ROW_SIZE, USER_ROW_SIZE);
 
+      if (restricted && (dap_read_byte(DSU_STATUSB) & DSU_STATUSB_PROT))
+        error_exit("target is locked, only erase operation is allowed");
+
       return;
     }
   }
@@ -154,25 +166,22 @@ static void target_select(target_options_t *options)
 //-----------------------------------------------------------------------------
 static void target_deselect(void)
 {
-  dap_write_word(DEMCR, 0x00000000);
-  dap_write_word(AIRCR, 0x05fa0004);
-
   target_free_options(&target_options);
 }
 
 //-----------------------------------------------------------------------------
 static void target_erase(void)
 {
-  dap_write_word(DSU_CTRL_STATUS, 0x00001f00); // Clear flags
-  dap_write_word(DSU_CTRL_STATUS, 0x00000010); // Chip erase
+  dap_write_byte(DSU_STATUSA, DSU_STATUSA_DONE);
+  dap_write_byte(DSU_CTRL, DSU_CTRL_CE);
   sleep_ms(100);
-  while (0 == (dap_read_word(DSU_CTRL_STATUS) & 0x00000100));
+  while (0 == (dap_read_byte(DSU_STATUSA) & DSU_STATUSA_DONE));
 }
 
 //-----------------------------------------------------------------------------
 static void target_lock(void)
 {
-  dap_write_word(NVMCTRL_CTRLA, NVMCTRL_CMD_SSB); // Set Security Bit
+  dap_write_half(NVMCTRL_CTRLA, NVMCTRL_CMD_SSB); // Set Security Bit
 }
 
 //-----------------------------------------------------------------------------
@@ -184,9 +193,6 @@ static void target_program(void)
   uint8_t *buf = target_options.file_data;
   uint32_t size = target_options.file_size;
 
-  if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
-    error_exit("device is locked, perform a chip erase before programming");
-
   number_of_rows = (size + FLASH_ROW_SIZE - 1) / FLASH_ROW_SIZE;
 
   dap_write_word(NVMCTRL_CTRLB, 0); // Enable automatic write
@@ -195,11 +201,11 @@ static void target_program(void)
   {
     dap_write_word(NVMCTRL_ADDR, addr >> 1);
 
-    dap_write_word(NVMCTRL_CTRLA, NVMCTRL_CMD_UR); // Unlock Region
-    while (0 == (dap_read_word(NVMCTRL_INTFLAG) & 1));
+    dap_write_half(NVMCTRL_CTRLA, NVMCTRL_CMD_UR); // Unlock Region
+    while (0 == (dap_read_byte(NVMCTRL_INTFLAG) & NVMCTRL_INTFLAG_READY));
 
-    dap_write_word(NVMCTRL_CTRLA, NVMCTRL_CMD_ER); // Erase Row
-    while (0 == (dap_read_word(NVMCTRL_INTFLAG) & 1));
+    dap_write_half(NVMCTRL_CTRLA, NVMCTRL_CMD_ER); // Erase Row
+    while (0 == (dap_read_byte(NVMCTRL_INTFLAG) & NVMCTRL_INTFLAG_READY));
 
     dap_write_block(addr, &buf[offs], FLASH_ROW_SIZE);
 
@@ -219,9 +225,6 @@ static void target_verify(void)
   uint8_t *bufb;
   uint8_t *bufa = target_options.file_data;
   uint32_t size = target_options.file_size;
-
-  if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
-    error_exit("device is locked, unable to verify");
 
   bufb = buf_alloc(FLASH_ROW_SIZE);
 
@@ -259,9 +262,6 @@ static void target_read(void)
   uint32_t offs = 0;
   uint8_t *buf = target_options.file_data;
   uint32_t size = target_options.size;
-
-  if (dap_read_word(DSU_CTRL_STATUS) & 0x00010000)
-    error_exit("device is locked, unable to read");
 
   while (size)
   {
@@ -330,8 +330,8 @@ static void target_fuse(void)
 
     dap_write_word(NVMCTRL_CTRLB, 0);
     dap_write_word(NVMCTRL_ADDR, USER_ROW_ADDR >> 1);
-    dap_write_word(NVMCTRL_CTRLA, NVMCTRL_CMD_EAR);
-    while (0 == (dap_read_word(NVMCTRL_INTFLAG) & 1));
+    dap_write_half(NVMCTRL_CTRLA, NVMCTRL_CMD_EAR);
+    while (0 == (dap_read_byte(NVMCTRL_INTFLAG) & NVMCTRL_INTFLAG_READY));
 
     dap_write_block(USER_ROW_ADDR, buf, USER_ROW_SIZE);
   }
