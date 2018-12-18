@@ -22,9 +22,9 @@ matrix:
   - os: osx
     compiler: gcc
     env: TARGET=OSX_GCC
-#  - os: linux
-#    compiler: gcc
-#    env: TARGET=WINDOWS
+  - os: linux
+    compiler: gcc
+    env: TARGET=WINDOWS
 
 
 before_install:
@@ -32,22 +32,13 @@ before_install:
   # Windows
   # =======
   #
-  # We are using MXE to build a Windows executable using Travis CI. edbg does
-  # not have any dependencies on Windows besides the Windows Driver Development
-  # Kit which will be provided here.
-  #
-  # @see http://mxe.cc/
   - if [[ "$TARGET" == "WINDOWS" ]]; then
 
       git clone --branch=v2.5 --depth=1 https://github.com/uic-evl/omicron.git omicron;
 
-      echo "deb http://pkg.mxe.cc/repos/apt/debian jessie main" | sudo tee /etc/apt/sources.list.d/mxeapt.list;
-      sudo apt-key adv --keyserver x-hkp://keyserver.ubuntu.com --recv-keys D43A795B73B16ABE9643FE1AFD8FFF16DB45C6AB;
+      sudo apt-get install gcc-mingw-w64
 
-      sudo apt-get -y update;
-      sudo apt-get -y install mxe-x86-64-w64-mingw32.static-gcc;
-
-      export CC='/usr/lib/mxe/usr/bin/x86_64-w64-mingw32.static-gcc -Iomicron/external/include';
+      export CC='x86_64-w64-mingw32-gcc -Iomicron/external/include';
       export UNAME=Windows;
     fi
 
