@@ -49,21 +49,25 @@
 #define DEMCR                  0xe000edfc
 #define AIRCR                  0xe000ed0c
 
-#define DSU_CTRL_STATUS        0x41002100
+#define DSU_CTRL               0x41002100
+#define DSU_STATUSA            0x41002101
+#define DSU_STATUSB            0x41002102
 #define DSU_DID                0x41002118
 
 #define DSU_CTRL_CE            (1 << 4)
+#define DSU_STATUSA_CRSTEXT    (1 << 1)
 
-#define DSU_STATUSA_DONE       (1 << 8)
-#define DSU_STATUSB_PROT       (1 << 16)
+#define DSU_STATUSA_DONE       (1 << 0)
+#define DSU_STATUSB_PROT       (1 << 0)
 
 #define NVMCTRL_CTRLA          0x41004000
 #define NVMCTRL_CTRLB          0x41004004
 #define NVMCTRL_PARAM          0x41004008
-#define NVMCTRL_INTFLAG_STATUS 0x41004010
+#define NVMCTRL_INTFLAG        0x41004010
+#define NVMCTRL_STATUS         0x41004012
 #define NVMCTRL_ADDR           0x41004014
 
-#define NVMCTRL_STATUS_READY   (1 << 16)
+#define NVMCTRL_STATUS_READY   (1 << 0)
 
 #define NVMCTRL_CTRLA_AUTOWS     (1 << 2)
 #define NVMCTRL_CTRLA_WMODE_MAN  (0 << 4)
@@ -109,10 +113,18 @@ static void target_select(target_options_t *options)
 {
   uint32_t dsu_did, id, rev;
 
+  // Enter reset extension mode
+  dap_reset_target_hw(0);
+  sleep_ms(10);
+  reconnect_debugger();
+
   // Stop the core
   dap_write_word(DHCSR, 0xa05f0003);
   dap_write_word(DEMCR, 0x00000001);
   dap_write_word(AIRCR, 0x05fa0004);
+
+  // Release the reset
+  dap_write_byte(DSU_STATUSA, DSU_STATUSA_CRSTEXT);
 
   dsu_did = dap_read_word(DSU_DID);
   id = dsu_did & DEVICE_ID_MASK;
@@ -149,15 +161,15 @@ static void target_deselect(void)
 //-----------------------------------------------------------------------------
 static void target_erase(void)
 {
-  dap_write_word(DSU_CTRL_STATUS, DSU_CTRL_CE); // Chip erase
+  dap_write_byte(DSU_CTRL, DSU_CTRL_CE); // Chip erase
   sleep_ms(100);
-  while (0 == (dap_read_word(DSU_CTRL_STATUS) & DSU_STATUSA_DONE));
+  while (0 == (dap_read_byte(DSU_STATUSA) & DSU_STATUSA_DONE));
 }
 
 //-----------------------------------------------------------------------------
 static void target_lock(void)
 {
-  dap_write_word(NVMCTRL_CTRLA, NVMCTRL_CMD_SSB); // Set Security Bit
+  dap_write_half(NVMCTRL_CTRLB, NVMCTRL_CMD_SSB); // Set Security Bit
 }
 
 //-----------------------------------------------------------------------------
@@ -169,10 +181,10 @@ static void target_program(void)
   uint8_t *buf = target_options.file_data;
   uint32_t size = target_options.file_size;
 
-  if (dap_read_word(DSU_CTRL_STATUS) & DSU_STATUSB_PROT)
+  if (dap_read_byte(DSU_STATUSB) & DSU_STATUSB_PROT)
     error_exit("device is locked, perform a chip erase before programming");
 
-  dap_write_word(NVMCTRL_CTRLA, NVMCTRL_CTRLA_AUTOWS | NVMCTRL_CTRLA_WMODE_MAN |
+  dap_write_half(NVMCTRL_CTRLA, NVMCTRL_CTRLA_AUTOWS | NVMCTRL_CTRLA_WMODE_MAN |
       NVMCTRL_CTRLA_PRM_MANUAL | NVMCTRL_CTRLA_CACHEDIS0 | NVMCTRL_CTRLA_CACHEDIS1);
 
   number_of_rows = (size + FLASH_ROW_SIZE - 1) / FLASH_ROW_SIZE;
@@ -181,23 +193,23 @@ static void target_program(void)
   {
     dap_write_word(NVMCTRL_ADDR, addr);
 
-    dap_write_word(NVMCTRL_CTRLB, NVMCTRL_CMD_UR); // Unlock Region
-    while (0 == (dap_read_word(NVMCTRL_INTFLAG_STATUS) & NVMCTRL_STATUS_READY));
+    dap_write_half(NVMCTRL_CTRLB, NVMCTRL_CMD_UR); // Unlock Region
+    while (0 == (dap_read_half(NVMCTRL_STATUS) & NVMCTRL_STATUS_READY));
 
-    dap_write_word(NVMCTRL_CTRLB, NVMCTRL_CMD_EB);
-    while (0 == (dap_read_word(NVMCTRL_INTFLAG_STATUS) & NVMCTRL_STATUS_READY));
+    dap_write_half(NVMCTRL_CTRLB, NVMCTRL_CMD_EB);
+    while (0 == (dap_read_half(NVMCTRL_STATUS) & NVMCTRL_STATUS_READY));
 
     for (int page = 0; page < PAGES_IN_ERASE_BLOCK; page++)
     {
       dap_write_word(NVMCTRL_ADDR, addr);
 
-      dap_write_word(NVMCTRL_CTRLB, NVMCTRL_CMD_PBC);
-      while (0 == (dap_read_word(NVMCTRL_INTFLAG_STATUS) & NVMCTRL_STATUS_READY));
+      dap_write_half(NVMCTRL_CTRLB, NVMCTRL_CMD_PBC);
+      while (0 == (dap_read_half(NVMCTRL_STATUS) & NVMCTRL_STATUS_READY));
 
       dap_write_block(addr, &buf[offs], FLASH_PAGE_SIZE);
 
-      dap_write_word(NVMCTRL_CTRLB, NVMCTRL_CMD_WP); // Write page
-      while (0 == (dap_read_word(NVMCTRL_INTFLAG_STATUS) & NVMCTRL_STATUS_READY));
+      dap_write_half(NVMCTRL_CTRLB, NVMCTRL_CMD_WP); // Write page
+      while (0 == (dap_read_half(NVMCTRL_STATUS) & NVMCTRL_STATUS_READY));
 
       addr += FLASH_PAGE_SIZE;
       offs += FLASH_PAGE_SIZE;
@@ -321,11 +333,11 @@ static void target_fuse(void)
 
     dap_write_word(NVMCTRL_ADDR, USER_ROW_ADDR);
 
-    dap_write_word(NVMCTRL_CTRLB, NVMCTRL_CMD_EP);
-    while (0 == (dap_read_word(NVMCTRL_INTFLAG_STATUS) & NVMCTRL_STATUS_READY));
+    dap_write_half(NVMCTRL_CTRLB, NVMCTRL_CMD_EP);
+    while (0 == (dap_read_half(NVMCTRL_STATUS) & NVMCTRL_STATUS_READY));
 
-    dap_write_word(NVMCTRL_CTRLB, NVMCTRL_CMD_PBC);
-    while (0 == (dap_read_word(NVMCTRL_INTFLAG_STATUS) & NVMCTRL_STATUS_READY));
+    dap_write_half(NVMCTRL_CTRLB, NVMCTRL_CMD_PBC);
+    while (0 == (dap_read_half(NVMCTRL_STATUS) & NVMCTRL_STATUS_READY));
 
     addr = USER_ROW_ADDR;
     offs = 0;
@@ -336,8 +348,8 @@ static void target_fuse(void)
 
       dap_write_block(addr, &buf[offs], USER_ROW_PAGE_SIZE);
 
-      dap_write_word(NVMCTRL_CTRLB, NVMCTRL_CMD_WQW);
-      while (0 == (dap_read_word(NVMCTRL_INTFLAG_STATUS) & NVMCTRL_STATUS_READY));
+      dap_write_half(NVMCTRL_CTRLB, NVMCTRL_CMD_WQW);
+      while (0 == (dap_read_half(NVMCTRL_STATUS) & NVMCTRL_STATUS_READY));
 
       addr += USER_ROW_PAGE_SIZE;
       offs += USER_ROW_PAGE_SIZE;
