@@ -88,6 +88,7 @@ typedef struct
 static device_t devices[] =
 {
   { 0x10040007, "SAM D09C13A",    8*1024 },
+  { 0x10040000, "SAM D09D14AM",  16*1024 },
   { 0x10020000, "SAM D10D14AM",  16*1024 },
   { 0x10030000, "SAM D11D14A",   16*1024 },
   { 0x10030000, "SAM D11D14AM",  16*1024 },
