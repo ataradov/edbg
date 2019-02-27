@@ -44,6 +44,15 @@
 #define USER_ROW_ADDR          0x00804000
 #define USER_ROW_SIZE          256
 
+#define DHCSR                  0xe000edf0
+#define DHCSR_DEBUGEN          (1 << 0)
+#define DHCSR_HALT             (1 << 1)
+#define DHCSR_DBGKEY           (0xa05f << 16)
+
+#define AIRCR                  0xe000ed0c
+#define AIRCR_VECTKEY          (0x05fa << 16)
+#define AIRCR_SYSRESETREQ      (1 << 2)
+
 #define DSU_CTRL               0x41002100
 #define DSU_STATUSA            0x41002101
 #define DSU_STATUSB            0x41002102
@@ -100,6 +109,8 @@ static device_t devices[] =
   { 0x10001000, "SAM D20J18A",  256*1024 },
   { 0x1001000d, "SAM D21E15A",   32*1024 },
   { 0x1001000b, "SAM D21E17A",  128*1024 },
+  { 0x10011020, "SAM D21J16B",   64*1024 },
+  { 0x10012092, "SAM D21J17D",  128*1024 },
   { 0x10010000, "SAM D21J18A",  256*1024 },
   { 0x1001000a, "SAM D21E18A",  256*1024 },
   { 0x10010006, "SAM D21G17A",  128*1024 },
@@ -135,6 +146,8 @@ static void target_select(target_options_t *options)
   sleep_ms(10);
   reconnect_debugger();
 
+  dap_write_word(DHCSR, DHCSR_DBGKEY | DHCSR_DEBUGEN | DHCSR_HALT);
+
   dsu_did = dap_read_word(DSU_DID);
   id = dsu_did & DEVICE_ID_MASK;
   rev = (dsu_did >> DEVICE_REV_SHIFT) & DEVICE_REV_MASK;
@@ -167,6 +180,8 @@ static void target_select(target_options_t *options)
 //-----------------------------------------------------------------------------
 static void target_deselect(void)
 {
+  dap_write_word(AIRCR, AIRCR_VECTKEY | AIRCR_SYSRESETREQ);
+
   target_free_options(&target_options);
 }
 
