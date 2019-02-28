@@ -44,10 +44,6 @@
 #define USER_ROW_ADDR          0x00804000
 #define BOCOR_ROW_ADDR         0x0080c000
 
-#define DHCSR                  0xe000edf0
-#define DEMCR                  0xe000edfc
-#define AIRCR                  0xe000ed0c
-
 #define DSU_CTRL               0x41002100
 #define DSU_STATUSA            0x41002101
 #define DSU_STATUSB            0x41002102

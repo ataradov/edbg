@@ -46,8 +46,16 @@
 #define USER_ROW_PAGE_SIZE     16
 
 #define DHCSR                  0xe000edf0
+#define DHCSR_DEBUGEN          (1 << 0)
+#define DHCSR_HALT             (1 << 1)
+#define DHCSR_DBGKEY           (0xa05f << 16)
+
 #define DEMCR                  0xe000edfc
+#define DEMCR_VC_CORERESET     (1 << 0)
+
 #define AIRCR                  0xe000ed0c
+#define AIRCR_VECTKEY          (0x05fa << 16)
+#define AIRCR_SYSRESETREQ      (1 << 2)
 
 #define DSU_CTRL               0x41002100
 #define DSU_STATUSA            0x41002101
@@ -119,9 +127,9 @@ static void target_select(target_options_t *options)
   reconnect_debugger();
 
   // Stop the core
-  dap_write_word(DHCSR, 0xa05f0003);
-  dap_write_word(DEMCR, 0x00000001);
-  dap_write_word(AIRCR, 0x05fa0004);
+  dap_write_word(DHCSR, DHCSR_DBGKEY | DHCSR_DEBUGEN | DHCSR_HALT);
+  dap_write_word(DEMCR, DEMCR_VC_CORERESET);
+  dap_write_word(AIRCR, AIRCR_VECTKEY | AIRCR_SYSRESETREQ);
 
   // Release the reset
   dap_write_byte(DSU_STATUSA, DSU_STATUSA_CRSTEXT);
@@ -152,8 +160,8 @@ static void target_select(target_options_t *options)
 //-----------------------------------------------------------------------------
 static void target_deselect(void)
 {
-  dap_write_word(DEMCR, 0x00000000);
-  dap_write_word(AIRCR, 0x05fa0004);
+  dap_write_word(DEMCR, 0);
+  dap_write_word(AIRCR, AIRCR_VECTKEY | AIRCR_SYSRESETREQ);
 
   target_free_options(&target_options);
 }

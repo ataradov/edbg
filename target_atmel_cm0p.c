@@ -49,6 +49,9 @@
 #define DHCSR_HALT             (1 << 1)
 #define DHCSR_DBGKEY           (0xa05f << 16)
 
+#define DEMCR                  0xe000edfc
+#define DEMCR_VC_CORERESET     (1 << 0)
+
 #define AIRCR                  0xe000ed0c
 #define AIRCR_VECTKEY          (0x05fa << 16)
 #define AIRCR_SYSRESETREQ      (1 << 2)
@@ -147,6 +150,8 @@ static void target_select(target_options_t *options)
   reconnect_debugger();
 
   dap_write_word(DHCSR, DHCSR_DBGKEY | DHCSR_DEBUGEN | DHCSR_HALT);
+  dap_write_word(DEMCR, DEMCR_VC_CORERESET);
+  dap_write_word(AIRCR, AIRCR_VECTKEY | AIRCR_SYSRESETREQ);
 
   dsu_did = dap_read_word(DSU_DID);
   id = dsu_did & DEVICE_ID_MASK;
@@ -180,6 +185,7 @@ static void target_select(target_options_t *options)
 //-----------------------------------------------------------------------------
 static void target_deselect(void)
 {
+  dap_write_word(DEMCR, 0);
   dap_write_word(AIRCR, AIRCR_VECTKEY | AIRCR_SYSRESETREQ);
 
   target_free_options(&target_options);
