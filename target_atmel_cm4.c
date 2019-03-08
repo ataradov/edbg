@@ -153,6 +153,9 @@ static void target_select(target_options_t *options)
 {
   uint32_t chip_id, chip_exid;
 
+  dap_reset_target_hw(1);
+  reconnect_debugger();
+
   // Stop the core
   dap_write_word(DHCSR, DHCSR_DBGKEY | DHCSR_DEBUGEN | DHCSR_HALT);
   dap_write_word(DEMCR, DEMCR_VC_CORERESET);

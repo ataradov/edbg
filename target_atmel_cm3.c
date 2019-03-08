@@ -152,6 +152,9 @@ static uint32_t get_eefc_base(uint32_t addr)
 //-----------------------------------------------------------------------------
 static void target_select(target_options_t *options)
 {
+  dap_reset_target_hw(1);
+  reconnect_debugger();
+
   // Stop the core
   dap_write_word(DHCSR, DHCSR_DBGKEY | DHCSR_DEBUGEN | DHCSR_HALT);
   dap_write_word(DEMCR, DEMCR_VC_CORERESET);
