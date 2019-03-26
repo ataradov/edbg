@@ -344,6 +344,8 @@ void dap_reset_target_hw(int state)
   buf[6] = 0;
   dbg_dap_cmd(buf, sizeof(buf), 7);
 
+  sleep_ms(10);
+
   //-------------
   buf[0] = ID_DAP_SWJ_PINS;
   buf[1] = DAP_SWJ_nRESET | value; // Value
