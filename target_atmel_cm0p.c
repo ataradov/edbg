@@ -145,26 +145,36 @@ static target_options_t target_options;
 /*- Implementations ---------------------------------------------------------*/
 
 //-----------------------------------------------------------------------------
-static void target_select(target_options_t *options)
+static void reset_with_extension(void)
 {
-  uint32_t dsu_did, id, rev;
-  bool restricted;
-
-  // Enter reset extension mode
   dap_reset_target_hw(0);
   sleep_ms(10);
   reconnect_debugger();
+}
 
+//-----------------------------------------------------------------------------
+static void finish_reset(void)
+{
+  // Stop the core
   dap_write_word(DHCSR, DHCSR_DBGKEY | DHCSR_DEBUGEN | DHCSR_HALT);
   dap_write_word(DEMCR, DEMCR_VC_CORERESET);
   dap_write_word(AIRCR, AIRCR_VECTKEY | AIRCR_SYSRESETREQ);
 
+  // Release the reset
+  dap_write_byte(DSU_STATUSA, DSU_STATUSA_CRSTEXT);
+}
+
+//-----------------------------------------------------------------------------
+static void target_select(target_options_t *options)
+{
+  uint32_t dsu_did, id, rev;
+  bool locked;
+
+  reset_with_extension();
+
   dsu_did = dap_read_word(DSU_DID);
   id = dsu_did & DEVICE_ID_MASK;
   rev = (dsu_did >> DEVICE_REV_SHIFT) & DEVICE_REV_MASK;
-
-  restricted = options->program || options->verify || options->read ||
-               options->lock || options->fuse;
 
   for (device_t *device = devices; device->dsu_did > 0; device++)
   {
@@ -178,8 +188,13 @@ static void target_select(target_options_t *options)
       target_check_options(&target_options, device->flash_size,
           FLASH_ROW_SIZE, USER_ROW_SIZE);
 
-      if (restricted && (dap_read_byte(DSU_STATUSB) & DSU_STATUSB_PROT))
-        error_exit("target is locked, only erase operation is allowed");
+      locked = dap_read_byte(DSU_STATUSB) & DSU_STATUSB_PROT;
+
+      if (locked && !options->erase)
+        error_exit("target is locked, erase is necessary");
+
+      if (!locked)
+        finish_reset();
 
       return;
     }
@@ -204,6 +219,9 @@ static void target_erase(void)
   dap_write_byte(DSU_CTRL, DSU_CTRL_CE);
   sleep_ms(100);
   while (0 == (dap_read_byte(DSU_STATUSA) & DSU_STATUSA_DONE));
+
+  reset_with_extension();
+  finish_reset();
 }
 
 //-----------------------------------------------------------------------------

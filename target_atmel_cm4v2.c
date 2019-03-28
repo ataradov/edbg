@@ -138,15 +138,16 @@ static target_options_t target_options;
 /*- Implementations ---------------------------------------------------------*/
 
 //-----------------------------------------------------------------------------
-static void target_select(target_options_t *options)
+static void reset_with_extension(void)
 {
-  uint32_t dsu_did, id, rev;
-
-  // Enter reset extension mode
   dap_reset_target_hw(0);
   sleep_ms(10);
   reconnect_debugger();
+}
 
+//-----------------------------------------------------------------------------
+static void finish_reset(void)
+{
   // Stop the core
   dap_write_word(DHCSR, DHCSR_DBGKEY | DHCSR_DEBUGEN | DHCSR_HALT);
   dap_write_word(DEMCR, DEMCR_VC_CORERESET);
@@ -154,6 +155,15 @@ static void target_select(target_options_t *options)
 
   // Release the reset
   dap_write_byte(DSU_STATUSA, DSU_STATUSA_CRSTEXT);
+}
+
+//-----------------------------------------------------------------------------
+static void target_select(target_options_t *options)
+{
+  uint32_t dsu_did, id, rev;
+  bool locked;
+
+  reset_with_extension();
 
   dsu_did = dap_read_word(DSU_DID);
   id = dsu_did & DEVICE_ID_MASK;
@@ -171,6 +181,14 @@ static void target_select(target_options_t *options)
       target_check_options(&target_options, device->flash_size,
           FLASH_ROW_SIZE, USER_ROW_SIZE);
 
+      locked = dap_read_byte(DSU_STATUSB) & DSU_STATUSB_PROT;
+
+      if (locked && !options->erase)
+        error_exit("target is locked, erase is necessary");
+
+      if (!locked)
+        finish_reset();
+
       return;
     }
   }
@@ -183,7 +201,6 @@ static void target_deselect(void)
 {
   dap_write_word(DEMCR, 0);
   dap_write_word(AIRCR, AIRCR_VECTKEY | AIRCR_SYSRESETREQ);
-
   target_free_options(&target_options);
 }
 
@@ -193,6 +210,9 @@ static void target_erase(void)
   dap_write_byte(DSU_CTRL, DSU_CTRL_CE); // Chip erase
   sleep_ms(100);
   while (0 == (dap_read_byte(DSU_STATUSA) & DSU_STATUSA_DONE));
+
+  reset_with_extension();
+  finish_reset();
 }
 
 //-----------------------------------------------------------------------------
@@ -209,9 +229,6 @@ static void target_program(void)
   uint32_t number_of_rows;
   uint8_t *buf = target_options.file_data;
   uint32_t size = target_options.file_size;
-
-  if (dap_read_byte(DSU_STATUSB) & DSU_STATUSB_PROT)
-    error_exit("device is locked, perform a chip erase before programming");
 
   dap_write_half(NVMCTRL_CTRLA, NVMCTRL_CTRLA_AUTOWS | NVMCTRL_CTRLA_WMODE_MAN |
       NVMCTRL_CTRLA_PRM_MANUAL | NVMCTRL_CTRLA_CACHEDIS0 | NVMCTRL_CTRLA_CACHEDIS1);
