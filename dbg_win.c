@@ -31,8 +31,19 @@
 #include <stdbool.h>
 #include <windows.h>
 #include <setupapi.h>          
+// NOTE: Different versions of MinGW seem to place those files in differnet
+//       locations. If you see build errors here, then use includes with
+//       'ddk/' prefix. The no-prefix version seems to be the best moving
+//       forward, so consider updating your version of MinGW. MinGW-W64
+//       appears to have most recent vestions of the tools, and that's
+//       what I'm currently using.
+#if 0
 #include <ddk/hidsdi.h>
 #include <ddk/hidpi.h>
+#else
+#include <hidsdi.h>
+#include <hidpi.h>
+#endif
 #include "dbg.h"
 #include "edbg.h"
 
