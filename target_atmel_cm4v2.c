@@ -130,7 +130,6 @@ static device_t devices[] =
   { 0x61840003, "same54", "SAM E54N19A",        512*1024 },
   { 0x61840000, "same54", "SAM E54P20A",     1*1024*1024 },
   { 0x61840002, "same54", "SAM E54N20A",     1*1024*1024 },
-  { 0 },
 };
 
 static device_t target_device;
