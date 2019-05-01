@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Alex Taradov <alex@taradov.com>
+ * Copyright (c) 2018-2019, Alex Taradov <alex@taradov.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -102,6 +102,7 @@ enum
   SIG_CMD_SUCCESS = 0x21,
   SIG_CMD_VALID   = 0x24,
   SIG_BOOTOK      = 0x39,
+  SIG_BOOT_ERR    = 0x41,
 };
 
 /*- Types -------------------------------------------------------------------*/
@@ -117,6 +118,7 @@ typedef struct
 typedef struct
 {
   uint32_t  dsu_did;
+  char      *family;
   char      *name;
   uint32_t  flash_size;
   bool      trust_zone;
@@ -125,9 +127,8 @@ typedef struct
 /*- Variables ---------------------------------------------------------------*/
 static device_t devices[] =
 {
-  { 0x20840000, "SAM L10E16A",  64*1024, false },
-  { 0x20830000, "SAM L11E16A",  64*1024, true  },
-  { 0 },
+  { 0x20840000, "saml10", "SAM L10E16A",  64*1024, false },
+  { 0x20830000, "saml11", "SAM L11E16A",  64*1024, true  },
 };
 
 static device_t target_device;
@@ -227,37 +228,36 @@ static void target_select(target_options_t *options)
   id = dsu_did & DEVICE_ID_MASK;
   rev = (dsu_did >> DEVICE_REV_SHIFT) & DEVICE_REV_MASK;
 
-  for (device_t *device = devices; device->dsu_did > 0; device++)
+  for (int i = 0; i < ARRAY_SIZE(devices); i++)
   {
-    if (device->dsu_did == id)
+    if (devices[i].dsu_did != id)
+      continue;
+
+    verbose("Target: %s (Rev %c)\n", devices[i].name, 'A' + rev);
+
+    target_device = devices[i];
+    target_options = *options;
+
+    if (target_device.trust_zone)
     {
-      verbose("Target: %s (Rev %c)\n", device->name, 'A' + rev);
-
-      target_device = *device;
-      target_options = *options;
-
-      if (target_device.trust_zone)
-      {
-        NVMCTRL_CTRLA  = NVMCTRL_NSEC_CTRLA + NVMCTRL_SEC_OFFSET;
-        NVMCTRL_CTRLB  = NVMCTRL_NSEC_CTRLB + NVMCTRL_SEC_OFFSET;
-        NVMCTRL_CTRLC  = NVMCTRL_NSEC_CTRLC + NVMCTRL_SEC_OFFSET;
-        NVMCTRL_STATUS = NVMCTRL_NSEC_STATUS + NVMCTRL_SEC_OFFSET;
-        NVMCTRL_ADDR   = NVMCTRL_NSEC_ADDR + NVMCTRL_SEC_OFFSET;
-      }
-      else
-      {
-        NVMCTRL_CTRLA  = NVMCTRL_NSEC_CTRLA;
-        NVMCTRL_CTRLB  = NVMCTRL_NSEC_CTRLB;
-        NVMCTRL_CTRLC  = NVMCTRL_NSEC_CTRLC;
-        NVMCTRL_STATUS = NVMCTRL_NSEC_STATUS;
-        NVMCTRL_ADDR   = NVMCTRL_NSEC_ADDR;
-      }
-
-      target_check_options(&target_options, device->flash_size,
-          FLASH_ROW_SIZE, FLASH_ROW_SIZE);
-
-      return;
+      NVMCTRL_CTRLA  = NVMCTRL_NSEC_CTRLA + NVMCTRL_SEC_OFFSET;
+      NVMCTRL_CTRLB  = NVMCTRL_NSEC_CTRLB + NVMCTRL_SEC_OFFSET;
+      NVMCTRL_CTRLC  = NVMCTRL_NSEC_CTRLC + NVMCTRL_SEC_OFFSET;
+      NVMCTRL_STATUS = NVMCTRL_NSEC_STATUS + NVMCTRL_SEC_OFFSET;
+      NVMCTRL_ADDR   = NVMCTRL_NSEC_ADDR + NVMCTRL_SEC_OFFSET;
     }
+    else
+    {
+      NVMCTRL_CTRLA  = NVMCTRL_NSEC_CTRLA;
+      NVMCTRL_CTRLB  = NVMCTRL_NSEC_CTRLB;
+      NVMCTRL_CTRLC  = NVMCTRL_NSEC_CTRLC;
+      NVMCTRL_STATUS = NVMCTRL_NSEC_STATUS;
+      NVMCTRL_ADDR   = NVMCTRL_NSEC_ADDR;
+    }
+
+    target_check_options(&target_options, target_device.flash_size, FLASH_ROW_SIZE);
+
+    return;
   }
 
   error_exit("unknown target device (DSU_DID = 0x%08x)", dsu_did);
@@ -272,13 +272,15 @@ static void target_deselect(void)
 //-----------------------------------------------------------------------------
 static void target_erase(void)
 {
-  uint32_t status = dap_read_word(DSU_BCC1);
-
   reset_with_extension();
 
-  status = dap_read_word(DSU_BCC1);
+  sleep_ms(10);
 
-  check(status == (SIG_PREFIX | SIG_BOOTOK), "BootROM indicated an error (STATUS = 0x%08x)");
+  if (dap_read_byte(DSU_STATUSB) & DSU_STATUSB_BCCD1)
+  {
+    uint32_t status = dap_read_word(DSU_BCC1);
+    error_exit("BootROM indicated an error (STATUS = 0x%08x)", status);
+  }
 
   bootrom_command(CMD_INIT);
   bootrom_expect(SIG_COMM);
@@ -418,114 +420,76 @@ static void target_read(void)
 }
 
 //-----------------------------------------------------------------------------
-static void target_fuse(void)
+static int target_fuse_read(int section, uint8_t *data)
 {
-  uint8_t buf[FLASH_ROW_SIZE];
-  bool read_all = (-1 == target_options.fuse_start);
-  int size = (target_options.fuse_size < FLASH_ROW_SIZE) ?
-      target_options.fuse_size : FLASH_ROW_SIZE;
   uint32_t addr = 0;
 
-  if (0 == target_options.fuse_section)
+  if (0 == section)
     addr = USER_ROW_ADDR;
-  else if (1 == target_options.fuse_section)
+  else if (1 == section)
     addr = BOCOR_ROW_ADDR;
   else
-    error_exit("unsupported fuse section %d", target_options.fuse_section);
+    return 0;
 
   bootrom_park();
 
-  dap_read_block(addr, buf, FLASH_ROW_SIZE);
+  dap_read_block(addr, data, FLASH_ROW_SIZE);
 
-  if (target_options.fuse_read)
-  {
-    if (target_options.fuse_name)
-    {
-      save_file(target_options.fuse_name, buf, FLASH_ROW_SIZE);
-    }
-    else if (read_all)
-    {
-      message("Fuses: ");
-
-      for (int i = 0; i < FLASH_ROW_SIZE; i++)
-        message("%02x ", buf[i]);
-
-      message("\n");
-    }
-    else
-    {
-      uint32_t value = extract_value(buf, target_options.fuse_start,
-          target_options.fuse_end);
-
-      message("Fuses: 0x%x (%d)\n", value, value);
-    }
-  }
-
-  if (target_options.fuse_write)
-  {
-    if (target_options.fuse_name)
-    {
-      for (int i = 0; i < size; i++)
-        buf[i] = target_options.fuse_data[i];
-    }
-    else
-    {
-      apply_value(buf, target_options.fuse_value, target_options.fuse_start,
-          target_options.fuse_end);
-    }
-
-    dap_write_byte(NVMCTRL_CTRLC, 0);
-    dap_write_word(NVMCTRL_ADDR, addr);
-    dap_write_half(NVMCTRL_CTRLA, NVMCTRL_CMD_ER);
-    while (0 == (dap_read_byte(NVMCTRL_STATUS) & NVMCTRL_STATUS_READY));
-
-    dap_write_block(addr, buf, FLASH_ROW_SIZE);
-  }
-
-  if (target_options.fuse_verify)
-  {
-    dap_read_block(addr, buf, FLASH_ROW_SIZE);
-
-    if (target_options.fuse_name)
-    {
-      for (int i = 0; i < size; i++)
-      {
-        if (target_options.fuse_data[i] != buf[i])
-        {
-          message("fuse byte %d expected 0x%02x, got 0x%02x", i,
-              target_options.fuse_data[i], buf[i]);
-          error_exit("fuse verification failed");
-        }
-      }
-    }
-    else if (read_all)
-    {
-      error_exit("please specify fuse bit range for verification");
-    }
-    else
-    {
-      uint32_t value = extract_value(buf, target_options.fuse_start,
-          target_options.fuse_end);
-
-      if (target_options.fuse_value != value)
-      {
-        error_exit("fuse verification failed: expected 0x%x (%u), got 0x%x (%u)",
-            target_options.fuse_value, target_options.fuse_value, value, value);
-      }
-    }
-  }
+  return FLASH_ROW_SIZE;
 }
+
+//-----------------------------------------------------------------------------
+static void target_fuse_write(int section, uint8_t *data)
+{
+  uint32_t addr = 0;
+
+  check(section < 2, "internal: incorrect section index in target_fuse_write()");
+
+  if (0 == section)
+    addr = USER_ROW_ADDR;
+  else
+    addr = BOCOR_ROW_ADDR;
+
+  bootrom_park();
+
+  dap_write_byte(NVMCTRL_CTRLC, 0);
+  dap_write_word(NVMCTRL_ADDR, addr);
+  dap_write_half(NVMCTRL_CTRLA, NVMCTRL_CMD_ER);
+  while (0 == (dap_read_byte(NVMCTRL_STATUS) & NVMCTRL_STATUS_READY));
+
+  dap_write_block(addr, data, FLASH_ROW_SIZE);
+}
+
+//-----------------------------------------------------------------------------
+static char *target_enumerate(int i)
+{
+  if (i < ARRAY_SIZE(devices))
+    return devices[i].family;
+
+  return NULL;
+}
+
+//-----------------------------------------------------------------------------
+static char target_help[] =
+  "Fuses:\n"
+  "  This device has two fuses sections:\n"
+  "   - Section 0 represents a complete User Row (256 bytes)\n"
+  "   - Section 1 represents a complete BOCOR Row (256 bytes)\n";
 
 //-----------------------------------------------------------------------------
 target_ops_t target_mchp_cm23_ops =
 {
-  .select   = target_select,
-  .deselect = target_deselect,
-  .erase    = target_erase,
-  .lock     = target_lock,
-  .program  = target_program,
-  .verify   = target_verify,
-  .read     = target_read,
-  .fuse     = target_fuse,
+  .select    = target_select,
+  .deselect  = target_deselect,
+  .erase     = target_erase,
+  .lock      = target_lock,
+  .unlock    = target_erase,
+  .program   = target_program,
+  .verify    = target_verify,
+  .read      = target_read,
+  .fread     = target_fuse_read,
+  .fwrite    = target_fuse_write,
+  .enumerate = target_enumerate,
+  .help      = target_help,
 };
 

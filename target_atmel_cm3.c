@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017, Alex Taradov <alex@taradov.com>
+ * Copyright (c) 2013-2019, Alex Taradov <alex@taradov.com>
  * Copyright (c) 2015, Thibaut VIARD for derivative work from original target_atmel_cm4.c and SAM3X/A port
  * All rights reserved.
  *
@@ -75,6 +75,7 @@
 typedef struct
 {
   uint32_t  chip_id;
+  char      *family;
   char      *name;
   uint32_t  chipid_base;
   int       n_planes;
@@ -89,22 +90,19 @@ typedef struct
 /*- Variables ---------------------------------------------------------------*/
 static device_t devices[] =
 {
-  { 0x286E0A60, "ATSAM3X8H", 0x400e0940, 2, {{ 0x400e0a00, 0x80000, 256*1024 }, { 0x400e0c00, 0xc0000, 256*1024 }} },
-  { 0x285E0A60, "ATSAM3X8E", 0x400e0940, 2, {{ 0x400e0a00, 0x80000, 256*1024 }, { 0x400e0c00, 0xc0000, 256*1024 }} },
-  { 0x285B0960, "ATSAM3X4E", 0x400e0940, 2, {{ 0x400e0a00, 0x80000, 128*1024 }, { 0x400e0c00, 0xa0000, 128*1024 }} },
-  { 0x284E0A60, "ATSAM3X8C", 0x400e0940, 2, {{ 0x400e0a00, 0x80000, 256*1024 }, { 0x400e0c00, 0xc0000, 256*1024 }} },
-  { 0x284B0960, "ATSAM3X4C", 0x400e0940, 2, {{ 0x400e0a00, 0x80000, 128*1024 }, { 0x400e0c00, 0xa0000, 128*1024 }} },
-  { 0x283E0A60, "ATSAM3A8C", 0x400e0940, 2, {{ 0x400e0a00, 0x80000, 256*1024 }, { 0x400e0c00, 0xc0000, 256*1024 }} },
-  { 0x283B0960, "ATSAM3A4C", 0x400e0940, 2, {{ 0x400e0a00, 0x80000, 128*1024 }, { 0x400e0c00, 0xa0000, 128*1024 }} },
-
-  { 0x28000961, "ATSAM3U4C", 0x400e0740, 2, {{ 0x400e0800, 0x80000, 128*1024 }, { 0x400e0a00, 0x100000, 128*1024 }} },
-  { 0x280A0761, "ATSAM3U2C", 0x400e0740, 1, {{ 0x400e0800, 0x80000, 128*1024 }} },
-  { 0x28090561, "ATSAM3U1C", 0x400e0740, 1, {{ 0x400e0800, 0x80000,  64*1024 }} },
-  { 0x28100961, "ATSAM3U4E", 0x400e0740, 2, {{ 0x400e0800, 0x80000, 128*1024 }, { 0x400e0a00, 0x100000, 128*1024 }} },
-  { 0x281A0761, "ATSAM3U2E", 0x400e0740, 1, {{ 0x400e0800, 0x80000, 128*1024 }} },
-  { 0x28190561, "ATSAM3U1E", 0x400e0740, 1, {{ 0x400e0800, 0x80000,  64*1024 }} },
-
-  { 0, "", 0, 0, {{ 0, 0, 0 }} },
+  { 0x286E0A60, "sam3x", "ATSAM3X8H", 0x400e0940, 2, {{ 0x400e0a00, 0x80000, 256*1024 }, { 0x400e0c00, 0xc0000, 256*1024 }} },
+  { 0x285E0A60, "sam3x", "ATSAM3X8E", 0x400e0940, 2, {{ 0x400e0a00, 0x80000, 256*1024 }, { 0x400e0c00, 0xc0000, 256*1024 }} },
+  { 0x285B0960, "sam3x", "ATSAM3X4E", 0x400e0940, 2, {{ 0x400e0a00, 0x80000, 128*1024 }, { 0x400e0c00, 0xa0000, 128*1024 }} },
+  { 0x284E0A60, "sam3x", "ATSAM3X8C", 0x400e0940, 2, {{ 0x400e0a00, 0x80000, 256*1024 }, { 0x400e0c00, 0xc0000, 256*1024 }} },
+  { 0x284B0960, "sam3x", "ATSAM3X4C", 0x400e0940, 2, {{ 0x400e0a00, 0x80000, 128*1024 }, { 0x400e0c00, 0xa0000, 128*1024 }} },
+  { 0x283E0A60, "sam3a", "ATSAM3A8C", 0x400e0940, 2, {{ 0x400e0a00, 0x80000, 256*1024 }, { 0x400e0c00, 0xc0000, 256*1024 }} },
+  { 0x283B0960, "sam3a", "ATSAM3A4C", 0x400e0940, 2, {{ 0x400e0a00, 0x80000, 128*1024 }, { 0x400e0c00, 0xa0000, 128*1024 }} },
+  { 0x28000961, "sam3u", "ATSAM3U4C", 0x400e0740, 2, {{ 0x400e0800, 0x80000, 128*1024 }, { 0x400e0a00, 0x100000, 128*1024 }} },
+  { 0x280A0761, "sam3u", "ATSAM3U2C", 0x400e0740, 1, {{ 0x400e0800, 0x80000, 128*1024 }} },
+  { 0x28090561, "sam3u", "ATSAM3U1C", 0x400e0740, 1, {{ 0x400e0800, 0x80000,  64*1024 }} },
+  { 0x28100961, "sam3u", "ATSAM3U4E", 0x400e0740, 2, {{ 0x400e0800, 0x80000, 128*1024 }, { 0x400e0a00, 0x100000, 128*1024 }} },
+  { 0x281A0761, "sam3u", "ATSAM3U2E", 0x400e0740, 1, {{ 0x400e0800, 0x80000, 128*1024 }} },
+  { 0x28190561, "sam3u", "ATSAM3U1E", 0x400e0740, 1, {{ 0x400e0800, 0x80000,  64*1024 }} },
 };
 
 static device_t target_device;
@@ -160,54 +158,53 @@ static void target_select(target_options_t *options)
   dap_write_word(DEMCR, DEMCR_VC_CORERESET);
   dap_write_word(AIRCR, AIRCR_VECTKEY | AIRCR_SYSRESETREQ);
 
-  for (device_t *device = devices; device->chip_id > 0; device++)
+  for (int i = 0; i < ARRAY_SIZE(devices); i++)
   {
     uint32_t chip_id, chip_exid;
+    uint32_t fl_id, fl_size, fl_page_size, fl_nb_palne, fl_nb_lock;
+    uint32_t flash_size = 0;
 
-    chip_id = dap_read_word(CHIPID_CIDR(device->chipid_base));
-    chip_exid = dap_read_word(CHIPID_EXID(device->chipid_base));
+    chip_id = dap_read_word(CHIPID_CIDR(devices[i].chipid_base));
+    chip_exid = dap_read_word(CHIPID_EXID(devices[i].chipid_base));
 
-    if (device->chip_id == chip_id && CHIPID_EXID_VALUE == chip_exid)
+    if (devices[i].chip_id != chip_id || CHIPID_EXID_VALUE != chip_exid)
+      continue;
+
+    verbose("Target: %s\n", devices[i].name);
+
+    for (int i = 0; i < devices[i].n_planes; i++)
     {
-      uint32_t fl_id, fl_size, fl_page_size, fl_nb_palne, fl_nb_lock;
-      uint32_t flash_size = 0;
+      uint32_t eefc_base = devices[i].plane[i].eefc_base;
 
-      verbose("Target: %s\n", device->name);
+      dap_write_word(EEFC_FCR(eefc_base), CMD_GETD);
+      while (0 == (dap_read_word(EEFC_FSR(eefc_base)) & FSR_FRDY));
 
-      for (int i = 0; i < device->n_planes; i++)
-      {
-        uint32_t eefc_base = device->plane[i].eefc_base;
+      fl_id = dap_read_word(EEFC_FRR(eefc_base));
+      check(fl_id, "Cannot read flash descriptor, check Erase pin state");
 
-        dap_write_word(EEFC_FCR(eefc_base), CMD_GETD);
-        while (0 == (dap_read_word(EEFC_FSR(eefc_base)) & FSR_FRDY));
+      fl_size = dap_read_word(EEFC_FRR(eefc_base));
+      check(fl_size == devices[i].plane[i].size, "Invalid reported Flash size (%d)", fl_size);
 
-        fl_id = dap_read_word(EEFC_FRR(eefc_base));
-        check(fl_id, "Cannot read flash descriptor, check Erase pin state");
+      fl_page_size = dap_read_word(EEFC_FRR(eefc_base));
+      check(fl_page_size == FLASH_PAGE_SIZE, "Invalid reported page size (%d)", fl_page_size);
 
-        fl_size = dap_read_word(EEFC_FRR(eefc_base));
-        check(fl_size == device->plane[i].size, "Invalid reported Flash size (%d)", fl_size);
+      fl_nb_palne = dap_read_word(EEFC_FRR(eefc_base));
+      for (uint32_t i = 0; i < fl_nb_palne; i++)
+        dap_read_word(EEFC_FRR(eefc_base));
 
-        fl_page_size = dap_read_word(EEFC_FRR(eefc_base));
-        check(fl_page_size == FLASH_PAGE_SIZE, "Invalid reported page size (%d)", fl_page_size);
+      fl_nb_lock =  dap_read_word(EEFC_FRR(eefc_base));
+      for (uint32_t i = 0; i < fl_nb_lock; i++)
+        dap_read_word(EEFC_FRR(eefc_base));
 
-        fl_nb_palne = dap_read_word(EEFC_FRR(eefc_base));
-        for (uint32_t i = 0; i < fl_nb_palne; i++)
-          dap_read_word(EEFC_FRR(eefc_base));
-
-        fl_nb_lock =  dap_read_word(EEFC_FRR(eefc_base));
-        for (uint32_t i = 0; i < fl_nb_lock; i++)
-          dap_read_word(EEFC_FRR(eefc_base));
-
-        flash_size += fl_size;
-      }
-
-      target_device = *device;
-      target_options = *options;
-
-      target_check_options(&target_options, flash_size, FLASH_PAGE_SIZE, GPNVM_SIZE);
-
-      return;
+      flash_size += fl_size;
     }
+
+    target_device = devices[i];
+    target_options = *options;
+
+    target_check_options(&target_options, flash_size, FLASH_PAGE_SIZE);
+
+    return;
   }
 
   error_exit("unknown target device");
@@ -328,113 +325,66 @@ static void target_read(void)
 }
 
 //-----------------------------------------------------------------------------
-static void target_fuse(void)
+static int target_fuse_read(int section, uint8_t *data)
 {
-  bool read_all = (-1 == target_options.fuse_start);
   uint32_t gpnvm;
-  uint8_t *buf = (uint8_t *)&gpnvm;
-  int size = (target_options.fuse_size < GPNVM_SIZE) ?
-      target_options.fuse_size : GPNVM_SIZE;
 
-  check(0 == target_options.fuse_section, "unsupported fuse section %d",
-      target_options.fuse_section);
+  if (section > 0)
+    return 0;
 
   dap_write_word(EEFC_FCR(get_eefc_base(0)), CMD_GGPB);
   while (0 == (dap_read_word(EEFC_FSR(get_eefc_base(0))) & FSR_FRDY));
   gpnvm = dap_read_word(EEFC_FRR(get_eefc_base(0)));
 
-  if (target_options.fuse_read)
+  data[0] = gpnvm;
+
+  return GPNVM_SIZE;
+}
+
+//-----------------------------------------------------------------------------
+static void target_fuse_write(int section, uint8_t *data)
+{
+  uint32_t gpnvm = data[0];
+
+  check(0 == section, "internal: incorrect section index in target_fuse_write()");
+
+  for (int i = 0; i < GPNVM_SIZE_BITS; i++)
   {
-    if (target_options.fuse_name)
-    {
-      save_file(target_options.fuse_name, buf, sizeof(gpnvm));
-    }
-    else if (read_all)
-    {
-      message("GPNVM Bits: 0x%02x\n", gpnvm);
-    }
+    if (gpnvm & (1 << i))
+      dap_write_word(EEFC_FCR(get_eefc_base(0)), CMD_SGPB | (i << 8));
     else
-    {
-      uint32_t value = extract_value(buf, target_options.fuse_start,
-          target_options.fuse_end);
-
-      message("GPNVM Bits: 0x%02x (%d)\n", value, value);
-    }
-  }
-
-  if (target_options.fuse_write)
-  {
-    if (target_options.fuse_name)
-    {
-      for (int i = 0; i < size; i++)
-        buf[i] = target_options.fuse_data[i];
-    }
-    else
-    {
-      apply_value(buf, target_options.fuse_value, target_options.fuse_start,
-          target_options.fuse_end);
-    }
-
-    for (int i = 0; i < GPNVM_SIZE_BITS; i++)
-    {
-      if (gpnvm & (1 << i))
-        dap_write_word(EEFC_FCR(get_eefc_base(0)), CMD_SGPB | (i << 8));
-      else
-        dap_write_word(EEFC_FCR(get_eefc_base(0)), CMD_CGPB | (i << 8));
-    }
-  }
-
-  if (target_options.fuse_verify)
-  {
-    dap_write_word(EEFC_FCR(get_eefc_base(0)), CMD_GGPB);
-    while (0 == (dap_read_word(EEFC_FSR(get_eefc_base(0))) & FSR_FRDY));
-    gpnvm = dap_read_word(EEFC_FRR(get_eefc_base(0)));
-
-    if (target_options.fuse_name)
-    {
-      for (int i = 0; i < size; i++)
-      {
-        if (target_options.fuse_data[i] != buf[i])
-        {
-          message("fuse byte %d expected 0x%02x, got 0x%02x", i,
-              target_options.fuse_data[i], buf[i]);
-          error_exit("fuse verification failed");
-        }
-      }
-    }
-    else
-    {
-      uint32_t value;
-
-      if (read_all)
-      {
-        value = gpnvm;
-      }
-      else
-      {
-        value = extract_value(buf, target_options.fuse_start,
-          target_options.fuse_end);
-      }
-
-      if (target_options.fuse_value != value)
-      {
-        error_exit("fuse verification failed: expected 0x%x (%u), got 0x%x (%u)",
-            target_options.fuse_value, target_options.fuse_value, value, value);
-      }
-    }
+      dap_write_word(EEFC_FCR(get_eefc_base(0)), CMD_CGPB | (i << 8));
   }
 }
 
 //-----------------------------------------------------------------------------
+static char *target_enumerate(int i)
+{
+  if (i < ARRAY_SIZE(devices))
+    return devices[i].family;
+
+  return NULL;
+}
+
+//-----------------------------------------------------------------------------
+static char target_help[] =
+  "Fuses:\n"
+  "  This device has one fuses section, which represents GPNVM bits.\n";
+
+//-----------------------------------------------------------------------------
 target_ops_t target_atmel_cm3_ops =
 {
-  .select   = target_select,
-  .deselect = target_deselect,
-  .erase    = target_erase,
-  .lock     = target_lock,
-  .program  = target_program,
-  .verify   = target_verify,
-  .read     = target_read,
-  .fuse     = target_fuse,
+  .select    = target_select,
+  .deselect  = target_deselect,
+  .erase     = target_erase,
+  .lock      = target_lock,
+  .unlock    = target_erase,
+  .program   = target_program,
+  .verify    = target_verify,
+  .read      = target_read,
+  .fread     = target_fuse_read,
+  .fwrite    = target_fuse_write,
+  .enumerate = target_enumerate,
+  .help      = target_help,
 };
 

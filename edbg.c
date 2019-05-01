@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017, Alex Taradov <alex@taradov.com>
+ * Copyright (c) 2013-2019, Alex Taradov <alex@taradov.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,7 +48,7 @@
 #include "dbg.h"
 
 /*- Definitions -------------------------------------------------------------*/
-#define VERSION           "v0.9"
+#define VERSION           "v0.10"
 
 #define MAX_DEBUGGERS     20
 
@@ -56,9 +56,7 @@
 #define O_BINARY 0
 #endif
 
-/*- Types -------------------------------------------------------------------*/
-
-/*- Variables ---------------------------------------------------------------*/
+/*- Constants ---------------------------------------------------------------*/
 static const struct option long_options[] =
 {
   { "help",      no_argument,        0, 'h' },
@@ -67,6 +65,7 @@ static const struct option long_options[] =
   { "program",   no_argument,        0, 'p' },
   { "verify",    no_argument,        0, 'v' },
   { "lock",      no_argument,        0, 'k' },
+  { "unlock",    no_argument,        0, 'u' },
   { "read",      no_argument,        0, 'r' },
   { "file",      required_argument,  0, 'f' },
   { "target",    required_argument,  0, 't' },
@@ -79,8 +78,9 @@ static const struct option long_options[] =
   { 0, 0, 0, 0 }
 };
 
-static const char *short_options = "hbepvkrf:t:ls:c:o:z:F:";
+static const char *short_options = "hbepvkurf:t:ls:c:o:z:F:";
 
+/*- Variables ---------------------------------------------------------------*/
 static char *g_serial = NULL;
 static bool g_list = false;
 static char *g_target = NULL;
@@ -93,16 +93,12 @@ static target_options_t g_target_options =
   .program      = false,
   .verify       = false,
   .lock         = false,
+  .unlock       = false,
   .read         = false,
-  .fuse         = false,
-  .fuse_read    = false,
-  .fuse_write   = false,
-  .fuse_verify  = false,
-  .fuse_section = 0,
-  .fuse_name    = NULL,
   .name         = NULL,
   .offset       = -1,
   .size         = -1,
+  .fuse_cmd     = NULL,
 };
 
 /*- Implementations ---------------------------------------------------------*/
@@ -212,6 +208,8 @@ void *buf_alloc(int size)
   if (NULL == (buf = malloc(size)))
     error_exit("out of memory");
 
+  memset(buf, 0, size);
+
   return buf;
 }
 
@@ -274,49 +272,6 @@ void save_file(char *name, uint8_t *data, int size)
 }
 
 //-----------------------------------------------------------------------------
-uint32_t extract_value(uint8_t *buf, int start, int end)
-{
-  uint32_t value = 0;
-  int bit = start;
-  int index = 0;
-
-  do
-  {
-    int by = bit / 8;
-    int bt = bit % 8;
-
-    if (buf[by] & (1 << bt))
-      value |= (1 << index);
-
-    bit++;
-    index++;
-  } while (bit <= end);
-
-  return value;
-}
-
-//-----------------------------------------------------------------------------
-void apply_value(uint8_t *buf, uint32_t value, int start, int end)
-{
-  int bit = start;
-  int index = 0;
-
-  do
-  {
-    int by = bit / 8;
-    int bt = bit % 8;
-
-    if (value & (1 << index))
-      buf[by] |= (1 << bt);
-    else
-      buf[by] &= ~(1 << bt);
-
-    bit++;
-    index++;
-  } while (bit <= end);
-}
-
-//-----------------------------------------------------------------------------
 static void print_clock_freq(int freq)
 {
   float value = freq;
@@ -349,33 +304,18 @@ void reconnect_debugger(void)
 }
 
 //-----------------------------------------------------------------------------
-static void print_help(char *name, char *param)
+static void print_help(char *name)
 {
   message("CMSIS-DAP SWD programmer " VERSION ", built " __DATE__ " " __TIME__ " \n\n");
 
-  if (0 == strcmp(param, "fuse"))
+  if (g_target)
   {
-    message(
-      "Fuse operations format: <actions><section>,<index/range>,<value>\n"
-      "  <actions>     - any combination of 'r' (read), 'w' (write), 'v' (verify)\n"
-      "  <section>     - index of the fuse section, may be omitted if device has only\n"
-      "                  one section (as most do)\n"
-      "  <index/range> - index of the fuse, or a range of fuses (limits separated by ':')\n"
-      "                  specify ':' to read all fuses\n"
-      "                  specify '*' to read and write values from a file\n"
-      "  <value>       - fuses value or file name for write and verify operations\n"
-      "                  immediate values must be 32 bits or less\n"
-      "\n"
-      "Exact fuse bits locations and values are target-dependent.\n"
-      "\n"
-      "Examples:\n"
-      "  -F w,1,1                -- set fuse bit 1\n"
-      "  -F w,8:7,0              -- clear fuse bits 8 and 7\n"
-      "  -F v,31:0,0x12345678    -- verify that fuse bits 31-0 are equal to 0x12345678\n"
-      "  -F wv,5,1               -- set and verify fuse bit 5\n"
-      "  -F r,:,                 -- read all fuses\n"
-      "  -F wv,*,fuses.bin       -- write and verify all fuses from a file\n"
-    );
+    target_ops_t *target_ops = target_get_ops(g_target);
+
+    if (target_ops->help)
+      message(target_ops->help);
+    else
+      message("Specified target does not have a help text.\n");
   }
   else
   {
@@ -388,6 +328,7 @@ static void print_help(char *name, char *param)
       "  -p, --program              program the chip\n"
       "  -v, --verify               verify memory\n"
       "  -k, --lock                 lock the chip (set security bit)\n"
+      "  -u, --unlock               unlock the chip (forces chip erase in most cases)\n"
       "  -r, --read                 read the whole content of the chip flash\n"
       "  -f, --file <file>          binary file to be programmed or verified; also read output file name\n"
       "  -t, --target <name>        specify a target type (use '-t list' for a list of supported target types)\n"
@@ -396,7 +337,7 @@ static void print_help(char *name, char *param)
       "  -c, --clock <freq>         interface clock frequency in kHz (default 16000)\n"
       "  -o, --offset <offset>      offset for the operation\n"
       "  -z, --size <size>          size for the operation\n"
-      "  -F, --fuse <options>       operations on the fuses (use '-h fuse' for details)\n"
+      "  -F, --fuse <options>       operations on the fuses (use '-F help' for details)\n"
     );
   }
 
@@ -404,89 +345,36 @@ static void print_help(char *name, char *param)
 }
 
 //-----------------------------------------------------------------------------
-static void parse_fuse_options(char *str)
+static void print_fuse_help(void)
 {
-  bool expect_name = false;
+  message(
+    "Fuse operations format: <actions><section>,<index/range>,<value>\n"
+    "  <actions>     - any combination of 'r' (read), 'w' (write), 'v' (verify)\n"
+    "  <section>     - index of the fuse section, may be omitted if device has only\n"
+    "                  one section; use '-h -t <target>' for more information\n"
+    "  <index/range> - index of the fuse, or a range of fuses (limits separated by ':')\n"
+    "                  specify ':' to read all fuses\n"
+    "                  specify '*' to read and write values from a file\n"
+    "  <value>       - fuses value or file name for write and verify operations\n"
+    "                  immediate values must be 32 bits or less\n"
+    "\n"
+    "Multiple operations may be specified in the same command.\n"
+    "They must be separated with a ';'.\n"
+    "\n"
+    "Exact fuse bits locations and values are target-dependent.\n"
+    "\n"
+    "Examples:\n"
+    "  -F w,1,1             -- set fuse bit 1\n"
+    "  -F w,8:7,0           -- clear fuse bits 8 and 7\n"
+    "  -F v,31:0,0x12345678 -- verify that fuse bits 31-0 are equal to 0x12345678\n"
+    "  -F wv,5,1            -- set and verify fuse bit 5\n"
+    "  -F r1,:,             -- read all fuses in a section 1\n"
+    "  -F wv,*,fuses.bin    -- write and verify all fuses from a file\n"
+    "  -F w0,1,1;w1,5,0     -- set fuse bit 1 in section 0 and\n"
+    "                          clear fuse bit 5 in section 1\n"
+  );
 
-  while (*str)
-  {
-    if ('r' == *str)
-      g_target_options.fuse_read = true;
-    else if ('w' == *str)
-      g_target_options.fuse_write = true;
-    else if ('v' == *str)
-      g_target_options.fuse_verify = true;
-    else
-      break;
-
-    g_target_options.fuse = true;
-
-    str++;
-  }
-
-  check(g_target_options.fuse, "no fuse operations spefified");
-
-  if (',' != *str)
-  {
-    g_target_options.fuse_section = (uint32_t)strtoul(str, &str, 0);
-  }
-
-  if (',' == *str)
-  {
-    str++;
-
-    if ('*' == *str)
-    {
-      str++;
-      expect_name = true;
-    }
-    else if (':' == *str)
-    {
-      str++;
-      g_target_options.fuse_end = -1;
-      g_target_options.fuse_start = -1;
-    }
-    else
-    {
-      g_target_options.fuse_end = (uint32_t)strtoul(str, &str, 0);
-
-      if (':' == *str)
-      {
-        str++;
-        g_target_options.fuse_start = (uint32_t)strtoul(str, &str, 0);
-      }
-      else
-      {
-        g_target_options.fuse_start = g_target_options.fuse_end;
-      }
-    }
-  }
-  else
-  {
-    error_exit("fuse index is required");
-  }
-
-  if (',' == *str)
-  {
-    str++;
-
-    if (expect_name)
-      g_target_options.fuse_name = strdup(str);
-    else
-      g_target_options.fuse_value = (uint32_t)strtoul(str, &str, 0);
-  }
-  else if (g_target_options.fuse_write || g_target_options.fuse_verify)
-  {
-    error_exit("value or name is required for fuse write and verify operations");
-  }
-
-  check(expect_name || 0 == *str, "junk at the end of fuse operations: '%s'", str);
-
-  check(g_target_options.fuse_end >= g_target_options.fuse_start,
-      "fuse bit range must be specified in a descending order");
-
-  check((g_target_options.fuse_end - g_target_options.fuse_start) <= 32,
-      "fuse bit range must be 32 bits or less");
+  exit(0);
 }
 
 //-----------------------------------------------------------------------------
@@ -494,16 +382,18 @@ static void parse_command_line(int argc, char **argv)
 {
   int option_index = 0;
   int c;
+  bool help = false;
 
   while ((c = getopt_long(argc, argv, short_options, long_options, &option_index)) != -1)
   {
     switch (c)
     {
-      case 'h': print_help(argv[0], (optind < argc) ? argv[optind] : ""); break;
+      case 'h': help = true; break;
       case 'e': g_target_options.erase = true; break;
       case 'p': g_target_options.program = true; break;
       case 'v': g_target_options.verify = true; break;
       case 'k': g_target_options.lock = true; break;
+      case 'u': g_target_options.unlock = true; break;
       case 'r': g_target_options.read = true; break;
       case 'f': g_target_options.name = optarg; break;
       case 't': g_target = optarg; break;
@@ -513,10 +403,16 @@ static void parse_command_line(int argc, char **argv)
       case 'b': g_verbose = true; break;
       case 'o': g_target_options.offset = (uint32_t)strtoul(optarg, NULL, 0); break;
       case 'z': g_target_options.size = (uint32_t)strtoul(optarg, NULL, 0); break;
-      case 'F': parse_fuse_options(optarg); break;
+      case 'F': g_target_options.fuse_cmd = optarg; break;
       default: exit(1); break;
     }
   }
+
+  if (help)
+    print_help(argv[0]);
+
+  if (g_target_options.fuse_cmd && 0 == strcmp(g_target_options.fuse_cmd, "help"))
+    print_fuse_help();
 
   check(optind >= argc, "malformed command line, use '-h' for more information");
 }
@@ -527,12 +423,12 @@ int main(int argc, char **argv)
   debugger_t debuggers[MAX_DEBUGGERS];
   int n_debuggers = 0;
   int debugger = -1;
-  target_t *target;
+  target_ops_t *target_ops;
 
   parse_command_line(argc, argv);
 
   if (!(g_target_options.erase || g_target_options.program || g_target_options.verify ||
-      g_target_options.lock || g_target_options.read || g_target_options.fuse ||
+      g_target_options.lock || g_target_options.read || g_target_options.fuse_cmd ||
       g_list || g_target))
     error_exit("no actions specified");
 
@@ -553,13 +449,13 @@ int main(int argc, char **argv)
   if (NULL == g_target)
     error_exit("no target type specified (use '-t' option)");
 
-  if (0 == strcmp("list", g_target))
+  if (0 == strcmp(g_target, "list"))
   {
     target_list();
     return 0;
   }
 
-  target = target_get_ops(g_target);
+  target_ops = target_get_ops(g_target);
 
   if (g_serial)
   {
@@ -589,107 +485,60 @@ int main(int argc, char **argv)
 
   print_clock_freq(g_clock);
 
-  target->ops->select(&g_target_options);
+  reconnect_debugger();
+
+  target_ops->select(&g_target_options);
+
+  if (g_target_options.unlock)
+  {
+    verbose("Unlocking... ");
+    target_ops->unlock();
+    verbose(" done.\n");
+  }
 
   if (g_target_options.erase)
   {
     verbose("Erasing... ");
-    target->ops->erase();
+    target_ops->erase();
     verbose(" done.\n");
   }
 
   if (g_target_options.program)
   {
     verbose("Programming...");
-    target->ops->program();
+    target_ops->program();
     verbose(" done.\n");
   }
 
   if (g_target_options.verify)
   {
     verbose("Verification...");
-    target->ops->verify();
+    target_ops->verify();
     verbose(" done.\n");
   }
 
   if (g_target_options.lock)
   {
     verbose("Locking... ");
-    target->ops->lock();
+    target_ops->lock();
     verbose(" done.\n");
   }
 
   if (g_target_options.read)
   {
     verbose("Reading...");
-    target->ops->read();
+    target_ops->read();
     verbose(" done.\n");
   }
 
-  if (g_target_options.fuse)
+  if (g_target_options.fuse_cmd)
   {
-    if (g_target_options.fuse_name)
-    {
-      if (g_target_options.fuse_read && (g_target_options.fuse_write ||
-          g_target_options.fuse_verify))
-      error_exit("mutually exclusive fuse actions specified");
-    }
-
-    verbose("Fuse section %d ", g_target_options.fuse_section);
-
-    if (g_target_options.fuse_read)
-    {
-      verbose("read");
-    }
-
-    if (g_target_options.fuse_write)
-    {
-      if (g_target_options.fuse_read)
-        verbose(", ");
-
-      verbose("write");
-    }
-
-    if (g_target_options.fuse_verify)
-    {
-      if (g_target_options.fuse_write)
-        verbose(", ");
-
-      verbose("verify");
-    }
-
-    if (g_target_options.fuse_name || -1 == g_target_options.fuse_end)
-    {
-      verbose(" all");
-    }
-    else if (g_target_options.fuse_start == g_target_options.fuse_end)
-    {
-      verbose(" bit %d", g_target_options.fuse_start);
-    }
-    else
-    {
-      verbose(" bits %d:%d", g_target_options.fuse_end,
-          g_target_options.fuse_start);
-    }
-
-    verbose(", ");
-
-    if (g_target_options.fuse_name)
-    {
-      verbose("file '%s'\n", g_target_options.fuse_name);
-    }
-    else
-    {
-      verbose("value 0x%x (%u)\n", g_target_options.fuse_value,
-          g_target_options.fuse_value);
-    }
-
-    target->ops->fuse();
-
+    verbose("Fuses:\n");
+    target_fuse_commands(target_ops, g_target_options.fuse_cmd);
     verbose("done.\n");
   }
 
-  target->ops->deselect();
+  target_ops->deselect();
 
   dap_reset_target_hw(1);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017, Alex Taradov <alex@taradov.com>
+ * Copyright (c) 2013-2019, Alex Taradov <alex@taradov.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,14 +34,6 @@
 #include <stdbool.h>
 #include <stdalign.h>
 
-/*- Definitions -------------------------------------------------------------*/
-enum
-{
-  TARGET_FUSE_READ   = (1 << 0),
-  TARGET_FUSE_WRITE  = (1 << 1),
-  TARGET_FUSE_VERIFY = (1 << 2),
-};
-
 /*- Types -------------------------------------------------------------------*/
 typedef struct
 {
@@ -49,26 +41,16 @@ typedef struct
   bool         program;
   bool         verify;
   bool         lock;
+  bool         unlock;
   bool         read;
-  bool         fuse;
-  bool         fuse_read;
-  bool         fuse_write;
-  bool         fuse_verify;
-  int          fuse_section;
-  int          fuse_start;
-  int          fuse_end;
-  uint32_t     fuse_value;
-  char         *fuse_name;
   char         *name;
   int32_t      offset;
   int32_t      size;
+  char         *fuse_cmd;
 
   // For target use only
   int          file_size;
   uint8_t      *file_data;
-
-  int          fuse_size;
-  uint8_t      *fuse_data;
 } target_options_t;
 
 typedef struct
@@ -77,24 +59,22 @@ typedef struct
   void (*deselect)(void);
   void (*erase)(void);
   void (*lock)(void);
+  void (*unlock)(void);
   void (*program)(void);
   void (*verify)(void);
   void (*read)(void);
-  void (*fuse)(void);
+  int  (*fread)(int section, uint8_t *data);
+  void (*fwrite)(int section, uint8_t *data);
+  char *(*enumerate)(int i);
+  char *help;
 } target_ops_t;
-
-typedef struct
-{
-  char         *name;
-  char         *description;
-  target_ops_t *ops;
-} target_t;
 
 /*- Prototypes --------------------------------------------------------------*/
 void target_list(void);
-target_t *target_get_ops(char *name);
-void target_check_options(target_options_t *options, int size, int align, int fuse_size);
+target_ops_t *target_get_ops(char *name);
+void target_check_options(target_options_t *options, int size, int align);
 void target_free_options(target_options_t *options);
+void target_fuse_commands(target_ops_t *ops, char *cmd);
 
 #endif // _TARGET_H_
 

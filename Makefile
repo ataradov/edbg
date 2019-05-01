@@ -11,6 +11,7 @@ SRCS = \
   target_atmel_cm7.c \
   target_atmel_cm4v2.c \
   target_mchp_cm23.c \
+  target_st_stm32g0.c \
 
 HDRS = \
   dap.h \

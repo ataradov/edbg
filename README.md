@@ -33,7 +33,8 @@ Options:
   -p, --program              program the chip
   -v, --verify               verify memory
   -k, --lock                 lock the chip (set security bit)
-  -r, --read                 read the contents of the chip
+  -u, --unlock               unlock the chip (forces chip erase in most cases)
+  -r, --read                 read the whole content of the chip flash
   -f, --file <file>          binary file to be programmed or verified; also read output file name
   -t, --target <name>        specify a target type (use '-t list' for a list of supported target types)
   -l, --list                 list all available debuggers
@@ -41,38 +42,44 @@ Options:
   -c, --clock <freq>         interface clock frequency in kHz (default 16000)
   -o, --offset <offset>      offset for the operation
   -z, --size <size>          size for the operation
-  -F, --fuse <options>       operations on the fuses (use '-h fuse' for details)
+  -F, --fuse <options>       operations on the fuses (use '-F help' for details)
 ```
 
 ```
-Fuse operations format: <actions>,<index/range>,<value>
+Fuse operations format: <actions><section>,<index/range>,<value>
   <actions>     - any combination of 'r' (read), 'w' (write), 'v' (verify)
+  <section>     - index of the fuse section, may be omitted if device has only
+                  one section; use '-h -t <target>' for more information
   <index/range> - index of the fuse, or a range of fuses (limits separated by ':')
                   specify ':' to read all fuses
                   specify '*' to read and write values from a file
   <value>       - fuses value or file name for write and verify operations
                   immediate values must be 32 bits or less
+```
+Multiple operations may be specified in the same command.
+They must be separated with a ';'.
 
 Exact fuse bits locations and values are target-dependent.
-```
 
 ## Examples
 ```
-> edbg -bpv -t atmel_cm7 -f build/Demo.bin
-Debugger: ATMEL EDBG CMSIS-DAP ATML2407060200000332 02.01.0157 (S)
-Target type: Cortex-M7
-Target: SAM V71J21
-Programming....,.. done.
-Verification....... done.
+>edbg -b -t samd11 -pv -f build/Demo.bin
+Debugger: ATMEL EDBG CMSIS-DAP ATML2178031800000312 01.1A.00FB (S)
+Clock frequency: 16.0 MHz
+Target: SAM D11D14A (Rev B)
+Programming............................................... done.
+Verification............................................... done.
+
 ```
 
 Fuse operations:
 ```
-  -F w,1,1                -- set fuse bit 1
-  -F w,8:7,0              -- clear fuse bits 8 and 7
-  -F v,31:0,0x12345678    -- verify that fuse bits 31-0 are equal to 0x12345678
-  -F wv,5,1               -- set and verify fuse bit 5
-  -F r,:,                 -- read all fuses
-  -F wv,*,fuses.bin       -- write and verify all fuses from a file
+  -F w,1,1             -- set fuse bit 1
+  -F w,8:7,0           -- clear fuse bits 8 and 7
+  -F v,31:0,0x12345678 -- verify that fuse bits 31-0 are equal to 0x12345678
+  -F wv,5,1            -- set and verify fuse bit 5
+  -F r1,:,             -- read all fuses in a section 1
+  -F wv,*,fuses.bin    -- write and verify all fuses from a file
+  -F w0,1,1;w1,5,0     -- set fuse bit 1 in section 0 and clear fuse bit 5 in section 1
 ```
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015, Alex Taradov <alex@taradov.com>
+ * Copyright (c) 2013-2019, Alex Taradov <alex@taradov.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,6 +34,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/*- Definitions -------------------------------------------------------------*/
+#define ARRAY_SIZE(x) ((int)(sizeof(x) / sizeof(0[x])))
+
 /*- Prototypes --------------------------------------------------------------*/
 void verbose(char *fmt, ...);
 void message(char *fmt, ...);
@@ -46,8 +49,6 @@ void *buf_alloc(int size);
 void buf_free(void *buf);
 int load_file(char *name, uint8_t *data, int size);
 void save_file(char *name, uint8_t *data, int size);
-uint32_t extract_value(uint8_t *buf, int start, int end);
-void apply_value(uint8_t *buf, uint32_t value, int start, int end);
 void reconnect_debugger(void);
 
 #endif // _EDBG_H_
