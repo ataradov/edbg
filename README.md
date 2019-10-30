@@ -3,9 +3,9 @@
 # CMSIS-DAP programmer (Formerly Atmel EDBG programmer)
 
 This is a simple command line utility for programming ARM-based MCUs
-(currently only Atmel) through CMSIS-DAP SWD interface. It works on Linux,
-Mac OS X and Windows. It was tested with Atmel mEDBG- and EDBG-based boards,
-Atmel-ICE, LPC-Link2 and IBDAP.
+through CMSIS-DAP SWD interface. It works on Linux, Mac OS X and Windows.
+It was tested with Atmel mEDBG- and EDBG-based boards, Atmel-ICE, LPC-Link2, IBDAP and
+[Free-DAP](https://github.com/ataradov/free-dap)-based debuggers.
 
 ## Installation
 
