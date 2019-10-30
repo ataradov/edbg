@@ -186,6 +186,12 @@ void perror_exit(char *text)
 }
 
 //-----------------------------------------------------------------------------
+int round_up(int value, int multiple)
+{
+  return ((value + multiple - 1) / multiple) * multiple;
+}
+
+//-----------------------------------------------------------------------------
 void sleep_ms(int ms)
 {
 #ifdef _WIN32

@@ -55,6 +55,7 @@ extern target_ops_t target_atmel_cm7_ops;
 extern target_ops_t target_atmel_cm4v2_ops;
 extern target_ops_t target_mchp_cm23_ops;
 extern target_ops_t target_st_stm32g0_ops;
+extern target_ops_t target_gd_gd32f4xx_ops;
 
 static target_t targets[] =
 {
@@ -65,6 +66,7 @@ static target_t targets[] =
   { "atmel_cm4v2",	"Atmel SAM D5x/E5x",			&target_atmel_cm4v2_ops },
   { "mchp_cm23",	"Microchip SAM L10/L11",		&target_mchp_cm23_ops },
   { NULL,		"STMicroelectronics STM32G0 series",	&target_st_stm32g0_ops },
+  { NULL,		"GigaDevice GD32F4xx series",		&target_gd_gd32f4xx_ops },
 };
 
 /*- Implementations ---------------------------------------------------------*/
@@ -348,16 +350,16 @@ static char *process_fuse_commands(target_ops_t *ops, char *cmd)
   {
     if (use_file)
     {
-      verbose("  saving %d bytes from section %d into file '%s': ", size, section, name);
+      verbose("  saving %d byte(s) from section %d into file '%s': ", size, section, name);
       save_file(name, data, size);
       verbose("OK\n");
     }
     else if (full_range)
     {
-      verbose("  reading %d bytes from section %d: ", size, section);
+      verbose("  reading %d byte(s) from section %d: ", size, section);
 
       for (int i = 0; i < size; i++)
-        message("%02x ", data[i]);
+        message("0x%02x ", data[i]);
 
       message("\n");
     }
@@ -381,11 +383,11 @@ static char *process_fuse_commands(target_ops_t *ops, char *cmd)
       uint8_t file_data[MAX_FUSE_SIZE];
       int rsize;
 
-      verbose("  writing %d bytes to section %d from file '%s': ", size, section, name);
+      verbose("  writing %d byte(s) to section %d from file '%s': ", size, section, name);
 
       rsize = load_file(name, file_data, size);
 
-      check(rsize == size, "file size (%d bytes) is less than section size (%d bytes)", rsize, size);
+      check(rsize == size, "file size (%d byte(s)) is less than section size (%d byte(s))", rsize, size);
 
       memcpy(data, file_data, size);
     }
@@ -419,7 +421,7 @@ static char *process_fuse_commands(target_ops_t *ops, char *cmd)
 
       rsize = load_file(name, file_data, size);
 
-      verbose("  verifying %d bytes from section %d using file '%s': ", rsize, section, name);
+      verbose("  verifying %d byte(s) from section %d using file '%s': ", rsize, section, name);
 
       for (int i = 0; i < rsize; i++)
       {

@@ -45,6 +45,7 @@ void check(bool cond, char *fmt, ...);
 void error_exit(char *fmt, ...);
 void sleep_ms(int ms);
 void perror_exit(char *text);
+int round_up(int value, int multiple);
 void *buf_alloc(int size);
 void buf_free(void *buf);
 int load_file(char *name, uint8_t *data, int size);
