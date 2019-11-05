@@ -43,6 +43,7 @@ void dap_swd_configure(uint8_t cfg);
 void dap_get_debugger_info(void);
 void dap_reset_target(void);
 void dap_reset_target_hw(int state);
+void dap_reset_pin(int state);
 uint32_t dap_read_reg(uint8_t reg);
 void dap_write_reg(uint8_t reg, uint32_t data);
 uint8_t dap_read_byte(uint32_t addr);

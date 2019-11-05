@@ -358,6 +358,21 @@ void dap_reset_target_hw(int state)
 }
 
 //-----------------------------------------------------------------------------
+void dap_reset_pin(int state)
+{
+  uint8_t buf[7];
+
+  buf[0] = ID_DAP_SWJ_PINS;
+  buf[1] = state ? DAP_SWJ_nRESET : 0; // Value
+  buf[2] = DAP_SWJ_nRESET; // Select
+  buf[3] = 0; // Wait
+  buf[4] = 0;
+  buf[5] = 0;
+  buf[6] = 0;
+  dbg_dap_cmd(buf, sizeof(buf), 7);
+}
+
+//-----------------------------------------------------------------------------
 uint32_t dap_read_reg(uint8_t reg)
 {
   uint8_t buf[8];

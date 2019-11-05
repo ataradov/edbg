@@ -174,10 +174,11 @@ static void target_select(target_options_t *options)
   uint32_t idcode, flash_size;
   bool locked, ctl_lk, ob_lk;
 
-  // Stop the core
+  dap_reset_pin(0);
   dap_write_word(DHCSR, DHCSR_DBGKEY | DHCSR_DEBUGEN | DHCSR_HALT);
   dap_write_word(DEMCR, DEMCR_VC_CORERESET);
   dap_write_word(AIRCR, AIRCR_VECTKEY | AIRCR_SYSRESETREQ);
+  dap_reset_pin(1);
 
   idcode = dap_read_word(DBG_ID);
 
