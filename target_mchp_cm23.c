@@ -281,9 +281,11 @@ static void target_erase(void)
     uint32_t status = dap_read_word(DSU_BCC1);
     error_exit("BootROM indicated an error (STATUS = 0x%08x)", status);
   }
-
-  bootrom_command(CMD_INIT);
-  bootrom_expect(SIG_COMM);
+  else
+  {
+    bootrom_command(CMD_INIT);
+    bootrom_expect(SIG_COMM);
+  }
 
   if (target_device.trust_zone)
   {
