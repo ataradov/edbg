@@ -33,6 +33,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -156,7 +157,8 @@ void dbg_open(debugger_t *debugger)
   debugger_fd = open(debugger->path, O_RDWR);
 
   if (debugger_fd < 0)
-    perror_exit("unable to open device");
+    error_exit("unable to open device %s: %s",  debugger->path,
+      strerror(errno));
 
   memset(&rpt_desc, 0, sizeof(rpt_desc));
   memset(&info, 0, sizeof(info));
