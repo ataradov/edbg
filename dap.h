@@ -33,6 +33,33 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/*- Definitions -------------------------------------------------------------*/
+enum
+{
+  DAP_INFO_VENDOR        = 0x01,
+  DAP_INFO_PRODUCT       = 0x02,
+  DAP_INFO_SER_NUM       = 0x03,
+  DAP_INFO_FW_VER        = 0x04,
+  DAP_INFO_DEVICE_VENDOR = 0x05,
+  DAP_INFO_DEVICE_NAME   = 0x06,
+  DAP_INFO_CAPABILITIES  = 0xf0,
+  DAP_INFO_TDT           = 0xf1,
+  DAP_INFO_SWO_BUF_SIZE  = 0xfd,
+  DAP_INFO_PACKET_COUNT  = 0xfe,
+  DAP_INFO_PACKET_SIZE   = 0xff,
+};
+
+enum
+{
+  DAP_CAP_SWD            = (1 << 0),
+  DAP_CAP_JTAG           = (1 << 1),
+  DAP_CAP_SWO_UART       = (1 << 2),
+  DAP_CAP_SWO_MANCHESTER = (1 << 3),
+  DAP_CAP_ATOMIC_CMD     = (1 << 4),
+  DAP_CAP_TDT            = (1 << 5),
+  DAP_CAP_SWO_STREAMING  = (1 << 6),
+};
+
 /*- Prototypes --------------------------------------------------------------*/
 void dap_led(int index, int state);
 void dap_connect(void);
@@ -40,7 +67,7 @@ void dap_disconnect(void);
 void dap_swj_clock(uint32_t clock);
 void dap_transfer_configure(uint8_t idle, uint16_t count, uint16_t retry);
 void dap_swd_configure(uint8_t cfg);
-void dap_get_debugger_info(void);
+int dap_info(int info, uint8_t *data, int size);
 void dap_reset_target(void);
 void dap_reset_target_hw(int state);
 void dap_reset_pin(int state);

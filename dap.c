@@ -37,8 +37,6 @@
 #include "dbg.h"
 
 /*- Definitions -------------------------------------------------------------*/
-
-/*- Types -------------------------------------------------------------------*/
 enum
 {
   ID_DAP_INFO               = 0x00,
@@ -63,19 +61,6 @@ enum
 
 enum
 {
-  DAP_INFO_VENDOR           = 0x01,
-  DAP_INFO_PRODUCT          = 0x02,
-  DAP_INFO_SER_NUM          = 0x03,
-  DAP_INFO_FW_VER           = 0x04,
-  DAP_INFO_DEVICE_VENDOR    = 0x05,
-  DAP_INFO_DEVICE_NAME      = 0x06,
-  DAP_INFO_CAPABILITIES     = 0xf0,
-  DAP_INFO_PACKET_COUNT     = 0xfe,
-  DAP_INFO_PACKET_SIZE      = 0xff,
-};
-
-enum
-{
   DAP_TRANSFER_APnDP        = 1 << 0,
   DAP_TRANSFER_RnW          = 1 << 1,
   DAP_TRANSFER_A2           = 1 << 2,
@@ -93,12 +78,6 @@ enum
   DAP_TRANSFER_ERROR        = 1 << 3,
   DAP_TRANSFER_MISMATCH     = 1 << 4,
   DAP_TRANSFER_NO_TARGET    = 7,
-};
-
-enum
-{
-  DAP_PORT_SWD   = 1 << 0,
-  DAP_PORT_JTAG  = 1 << 1,
 };
 
 enum
@@ -210,10 +189,10 @@ void dap_connect(void)
   uint8_t buf[2];
 
   buf[0] = ID_DAP_CONNECT;
-  buf[1] = DAP_PORT_SWD;
+  buf[1] = DAP_CAP_SWD;
   dbg_dap_cmd(buf, sizeof(buf), 2);
 
-  check(DAP_PORT_SWD == buf[0], "DAP_CONNECT failed");
+  check(DAP_CAP_SWD == buf[0], "DAP_CONNECT failed");
 }
 
 //-----------------------------------------------------------------------------
@@ -269,52 +248,22 @@ void dap_swd_configure(uint8_t cfg)
 }
 
 //-----------------------------------------------------------------------------
-void dap_get_debugger_info(void)
+int dap_info(int info, uint8_t *data, int size)
 {
-  uint8_t buf[100];
-  char str[500] = "";
+  uint8_t buf[256];
+  int rsize;
 
   buf[0] = ID_DAP_INFO;
-  buf[1] = DAP_INFO_VENDOR;
-  dbg_dap_cmd(buf, sizeof(buf), 2);
-  strncat(str, (char *)&buf[1], buf[0]);
-  strcat(str, " ");
-
-  buf[0] = ID_DAP_INFO;
-  buf[1] = DAP_INFO_PRODUCT;
-  dbg_dap_cmd(buf, sizeof(buf), 2);
-  strncat(str, (char *)&buf[1], buf[0]);
-  strcat(str, " ");
-
-  buf[0] = ID_DAP_INFO;
-  buf[1] = DAP_INFO_SER_NUM;
-  dbg_dap_cmd(buf, sizeof(buf), 2);
-  strncat(str, (char *)&buf[1], buf[0]);
-  strcat(str, " ");
-
-  buf[0] = ID_DAP_INFO;
-  buf[1] = DAP_INFO_FW_VER;
-  dbg_dap_cmd(buf, sizeof(buf), 2);
-  strncat(str, (char *)&buf[1], buf[0]);
-  strcat(str, " ");
-
-  buf[0] = ID_DAP_INFO;
-  buf[1] = DAP_INFO_CAPABILITIES;
+  buf[1] = info;
   dbg_dap_cmd(buf, sizeof(buf), 2);
 
-  strcat(str, "(");
+  rsize = (size < buf[0]) ? size : buf[0];
+  memcpy(data, &buf[1], rsize);
 
-  if (buf[1] & DAP_PORT_SWD)
-    strcat(str, "S");
+  if (rsize < size)
+    data[rsize] = 0;
 
-  if (buf[1] & DAP_PORT_JTAG)
-    strcat(str, "J");
-
-  strcat(str, ")");
-
-  verbose("Debugger: %s\n", str);
-
-  check(buf[1] & DAP_PORT_SWD, "SWD support required");
+  return rsize;
 }
 
 //-----------------------------------------------------------------------------

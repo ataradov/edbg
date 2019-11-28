@@ -145,7 +145,7 @@ void dbg_open(debugger_t *debugger)
       FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
 
   if (INVALID_HANDLE_VALUE == debugger_handle)
-    error_exit("unable to open device");
+    error_exit("unable to open device %s: 0x%08x",  debugger->path, GetLastError());
 
   HidD_GetPreparsedData(debugger_handle, &prep);
   HidP_GetCaps(prep, &caps);

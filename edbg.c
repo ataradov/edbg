@@ -278,6 +278,47 @@ void save_file(char *name, uint8_t *data, int size)
 }
 
 //-----------------------------------------------------------------------------
+static void print_debugger_info(debugger_t *debugger)
+{
+  uint8_t buf[256];
+  char str[512] = "Debugger: ";
+  int size;
+
+  size = dap_info(DAP_INFO_VENDOR, buf, sizeof(buf));
+  strcat(str, size ? (char *)buf : debugger->manufacturer);
+  strcat(str, " ");
+
+  size = dap_info(DAP_INFO_PRODUCT, buf, sizeof(buf));
+  strcat(str, size ? (char *)buf : debugger->product);
+  strcat(str, " ");
+
+  size = dap_info(DAP_INFO_SER_NUM, buf, sizeof(buf));
+  strcat(str, size ? (char *)buf : debugger->serial);
+  strcat(str, " ");
+
+  size = dap_info(DAP_INFO_FW_VER, buf, sizeof(buf));
+  strcat(str, (char *)buf);
+  strcat(str, " ");
+
+  size = dap_info(DAP_INFO_CAPABILITIES, buf, sizeof(buf));
+  check(size == 1, "incorrect DAP_INFO_CAPABILITIES size");
+
+  strcat(str, "(");
+
+  if (buf[0] & DAP_CAP_SWD)
+    strcat(str, "S");
+
+  if (buf[0] & DAP_CAP_JTAG)
+    strcat(str, "J");
+
+  strcat(str, ")\n");
+
+  verbose(str);
+
+  check(buf[0] & DAP_CAP_SWD, "SWD support required");
+}
+
+//-----------------------------------------------------------------------------
 static void print_clock_freq(int freq)
 {
   float value = freq;
@@ -487,8 +528,7 @@ int main(int argc, char **argv)
 
   dbg_open(&debuggers[debugger]);
 
-  dap_get_debugger_info();
-
+  print_debugger_info(&debuggers[debugger]);
   print_clock_freq(g_clock);
 
   reconnect_debugger();
