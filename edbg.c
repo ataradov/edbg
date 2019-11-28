@@ -345,9 +345,9 @@ void reconnect_debugger(void)
   dap_connect();
   dap_transfer_configure(0, 128, 128);
   dap_swd_configure(0);
-  dap_led(0, 1);
-  dap_reset_link();
   dap_swj_clock(g_clock);
+  dap_reset_link();
+  dap_led(0, 1);
 }
 
 //-----------------------------------------------------------------------------
