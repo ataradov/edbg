@@ -29,6 +29,25 @@ matrix:
 
 before_install:
 
+  # Linux
+  # =====
+  #
+  # Installing the libudev-dev dependency is sufficient
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+      sudo apt-get -y update;
+      sudo apt-get -y install libudev-dev;
+    fi
+
+
+  # OS X
+  # ====
+  #
+  # Installing the libhidapi via brew
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+      brew install hidapi;
+    fi
+
+
   # Windows
   # =======
   #
@@ -40,16 +59,6 @@ before_install:
 
       export CC='x86_64-w64-mingw32-gcc -Iomicron/external/include/ddk';
       export UNAME=Windows;
-    fi
-
-
-  # Linux
-  # =====
-  #
-  # Installing the libudev-dev dependency is sufficient
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-      sudo apt-get -y update;
-      sudo apt-get -y install libudev-dev;
     fi
 
 

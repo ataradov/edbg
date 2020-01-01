@@ -28,11 +28,11 @@ else
   ifeq ($(UNAME), Darwin)
     BIN = edbg
     SRCS += dbg_mac.c
-    LIBS += hidapi/mac/.libs/libhidapi.a
+    LIBS += /usr/local/lib/libhidapi.a
     LIBS += -framework IOKit
     LIBS += -framework CoreFoundation
-    HIDAPI = hidapi/mac/.libs/libhidapi.a
-    CFLAGS += -Ihidapi/hidapi
+    HIDAPI = /usr/local/lib/libhidapi.a
+    CFLAGS += -I/usr/local/include/hidapi
   else
     BIN = edbg.exe
     SRCS += dbg_win.c
@@ -44,15 +44,9 @@ CFLAGS += -W -Wall -Wextra -O2 -std=gnu11
 
 all: $(BIN)
 
-$(BIN): $(SRCS) $(HDRS) $(HIDAPI)
+$(BIN): $(SRCS) $(HDRS)
 	$(COMPILER) $(CFLAGS) $(SRCS) $(LIBS) -o $(BIN)
 
-hidapi/mac/.libs/libhidapi.a:
-	git clone git://github.com/signal11/hidapi.git
-	cd hidapi && ./bootstrap
-	cd hidapi && ./configure
-	$(MAKE) -Chidapi
-
 clean:
-	rm -rvf $(BIN) hidapi
+	rm -rvf $(BIN)
 
