@@ -21,7 +21,7 @@ you will need:
 
  * Windows: none
  * Linux: libudev-dev
- * Mac OS X: libhidapi (built automatically by a Makefile)
+ * Mac OS X: libhidapi (can be installed via [brew](http://macappstore.org/hidapi/))
 
 ## Usage
 ```
