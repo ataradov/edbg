@@ -66,6 +66,11 @@
 #define DSU_STATUSA_CRSTEXT    (1 << 1)
 #define DSU_STATUSB_PROT       (1 << 0)
 
+#define SERIAL_NUMBER_0        0x0080a00c
+#define SERIAL_NUMBER_1        0x0080a040
+#define SERIAL_NUMBER_2        0x0080a044
+#define SERIAL_NUMBER_3        0x0080a048
+
 #define NVMCTRL_CTRLA          0x41004000
 #define NVMCTRL_CTRLB          0x41004004
 #define NVMCTRL_PARAM          0x41004008
@@ -175,6 +180,7 @@ static void finish_reset(void)
 static void target_select(target_options_t *options)
 {
   uint32_t dsu_did, id, rev;
+  uint32_t serial_number[4];
   bool locked;
 
   reset_with_extension();
@@ -189,6 +195,14 @@ static void target_select(target_options_t *options)
       continue;
 
     verbose("Target: %s (Rev %c)\n", devices[i].name, 'A' + rev);
+
+    serial_number[0] = dap_read_word(SERIAL_NUMBER_0);
+    serial_number[1] = dap_read_word(SERIAL_NUMBER_1);
+    serial_number[2] = dap_read_word(SERIAL_NUMBER_2);
+    serial_number[3] = dap_read_word(SERIAL_NUMBER_3);
+
+    verbose("Serial number: %08x %08x %08x %08x\n",
+        serial_number[0], serial_number[1], serial_number[2], serial_number[3]);
 
     target_device = devices[i];
     target_options = *options;
