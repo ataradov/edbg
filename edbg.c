@@ -345,6 +345,11 @@ void reconnect_debugger(void)
   dap_connect();
   dap_transfer_configure(0, 128, 128);
   dap_swd_configure(0);
+
+  // on-board EDBG for wants the clock to be configured only when the link is
+  // already open
+  //
+  // @see https://github.com/ataradov/edbg/issues/97#issuecomment-667579850
   dap_reset_link();
   dap_swj_clock(g_clock);
   dap_led(0, 1);
