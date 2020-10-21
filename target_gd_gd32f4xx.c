@@ -435,7 +435,7 @@ static void target_fuse_write(int section, uint8_t *data)
     ob1 = value;
   }
 
-  ob0 &= ~(FMC_OBCTL0_OB_LK & FMC_OBCTL0_OB_START);
+  ob0 &= ~(FMC_OBCTL0_OB_LK | FMC_OBCTL0_OB_START);
 
   dap_write_word(FMC_OBCTL1, ob1);
   dap_write_word(FMC_OBCTL0, ob0);
