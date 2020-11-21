@@ -30,6 +30,7 @@ else
     SRCS += dbg_mac.c
     LIBS += /usr/local/lib/libhidapi.a
     LIBS += -framework IOKit
+    LIBS += -framework Foundation
     LIBS += -framework CoreFoundation
     HIDAPI = /usr/local/lib/libhidapi.a
     CFLAGS += -I/usr/local/include/hidapi
