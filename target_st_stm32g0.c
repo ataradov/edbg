@@ -123,6 +123,8 @@
 
 #define OPTIONS_SIZE           4
 
+#define DEVICE_ID_MASK         0x0000ffff
+
 /*- Types -------------------------------------------------------------------*/
 typedef struct
 {
@@ -146,7 +148,8 @@ typedef struct
 /*- Variables ---------------------------------------------------------------*/
 static device_t devices[] =
 {
-  { 0x20006460, "stm32g0", "STM32G071 (Rev B)" },
+  { 0x6460, "stm32g0", "STM32G071/81" },
+  { 0x6466, "stm32g0", "STM32G031/41" },
 };
 
 static device_t target_device;
@@ -174,16 +177,23 @@ static void target_select(target_options_t *options)
   uint32_t idcode, flash_size;
   bool locked;
 
+  dap_connect();
+  dap_reset_pin(0);
+  dap_reset_link();
+
   // Stop the core
   dap_write_word(DHCSR, DHCSR_DBGKEY | DHCSR_DEBUGEN | DHCSR_HALT);
   dap_write_word(DEMCR, DEMCR_VC_CORERESET);
   dap_write_word(AIRCR, AIRCR_VECTKEY | AIRCR_SYSRESETREQ);
 
+  dap_reset_pin(1);
+  sleep_ms(10);
+
   idcode = dap_read_word(DBG_IDCODE);
 
   for (int i = 0; i < ARRAY_SIZE(devices); i++)
   {
-    if (devices[i].idcode != idcode)
+    if (devices[i].idcode != (idcode & DEVICE_ID_MASK))
       continue;
 
     verbose("Target: %s\n", devices[i].name);
@@ -398,4 +408,5 @@ target_ops_t target_st_stm32g0_ops =
   .enumerate = target_enumerate,
   .help      = target_help,
 };
+
 
