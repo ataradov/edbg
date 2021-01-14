@@ -190,7 +190,7 @@ int dbg_get_report_size(void)
 //-----------------------------------------------------------------------------
 int dbg_dap_cmd(uint8_t *data, int size, int rsize)
 {
-  char cmd = data[0];
+  uint8_t cmd = data[0];
   int res;
 
   memset(hid_buffer, 0xff, report_size + 1);
