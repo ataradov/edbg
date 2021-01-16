@@ -52,7 +52,7 @@ int dbg_enumerate(debugger_t *debuggers, int size);
 void dbg_open(debugger_t *debugger);
 void dbg_close(void);
 int dbg_get_report_size(void);
-int dbg_dap_cmd(uint8_t *data, int size, int rsize);
+int dbg_dap_cmd(uint8_t *data, int resp_size, int req_size);
 
 #endif // _DBG_H_
 

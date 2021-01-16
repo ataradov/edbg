@@ -188,7 +188,7 @@ int dbg_get_report_size(void)
 }
 
 //-----------------------------------------------------------------------------
-int dbg_dap_cmd(uint8_t *data, int size, int rsize)
+int dbg_dap_cmd(uint8_t *data, int resp_size, int req_size)
 {
   uint8_t cmd = data[0];
   int res;
@@ -196,7 +196,7 @@ int dbg_dap_cmd(uint8_t *data, int size, int rsize)
   memset(hid_buffer, 0xff, report_size + 1);
 
   hid_buffer[0] = 0x00; // Report ID
-  memcpy(&hid_buffer[1], data, rsize);
+  memcpy(&hid_buffer[1], data, req_size);
 
   res = write(debugger_fd, hid_buffer, report_size + 1);
   if (res < 0)
@@ -211,7 +211,7 @@ int dbg_dap_cmd(uint8_t *data, int size, int rsize)
   check(hid_buffer[0] == cmd, "invalid response received");
 
   res--;
-  memcpy(data, &hid_buffer[1], (size < res) ? size : res);
+  memcpy(data, &hid_buffer[1], (resp_size < res) ? resp_size : res);
 
   return res;
 }
