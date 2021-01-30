@@ -116,7 +116,7 @@ void target_list(void)
 }
 
 //-----------------------------------------------------------------------------
-target_ops_t *target_get_ops(char *name)
+target_ops_t *target_get_ops(const char *name)
 {
   for (int i = 0; i < ARRAY_SIZE(targets); i++)
   {
