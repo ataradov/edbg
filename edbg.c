@@ -135,7 +135,7 @@ void message(char *fmt, ...)
 void warning(char *fmt, ...)
 {
   va_list args;
- 
+
   va_start(args, fmt);
   fprintf(stderr, "Warning: ");
   vfprintf(stderr, fmt, args);
@@ -146,9 +146,16 @@ void warning(char *fmt, ...)
 //-----------------------------------------------------------------------------
 void check(bool cond, char *fmt, ...)
 {
+  static bool check_failed = false;
+
+  if (check_failed)
+    return;
+
   if (!cond)
   {
     va_list args;
+
+    check_failed = true;
 
     if (g_debugger)
     {
