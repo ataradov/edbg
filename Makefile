@@ -31,6 +31,7 @@ else
     LIBS += -framework IOKit
     LIBS += -framework Foundation
     LIBS += -framework CoreFoundation
+    LIBS += -framework Cocoa
     LIBS += /usr/local/lib/libhidapi.a
     CFLAGS += -I/usr/local/include/hidapi
   else
