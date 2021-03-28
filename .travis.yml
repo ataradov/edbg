@@ -19,6 +19,7 @@ matrix:
   - os: linux
     compiler: gcc
     env: TARGET=WINDOWS
+
 #  - os: osx
 #    compiler: clang
 #    env: TARGET=OSX_CLANG
@@ -89,7 +90,7 @@ script:
 #
 # Environment when building master
 # ================================
-#
+# 
 # TRAVIS_BRANCH		master
 # TRAVIS_PULL_REQUEST	false
 #

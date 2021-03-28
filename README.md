@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/ataradov/edbg.svg?branch=master)](https://travis-ci.org/ataradov/edbg)
 
-# CMSIS-DAP programmer (Formerly Atmel EDBG programmer)
+# CMSIS-DAP programmer
 
 This is a simple command line utility for programming ARM-based MCUs
 through CMSIS-DAP SWD interface. It works on Linux, Mac OS X and Windows.
@@ -9,7 +9,7 @@ It was tested with Atmel mEDBG- and EDBG-based boards, Atmel-ICE, LPC-Link2, IBD
 
 ## Installation
 
-Binary releases can be downloaded [here](https://dl.bintray.com/ataradov/edbg/master/). 
+Binary releases can be downloaded [here](https://dl.bintray.com/ataradov/edbg/master/).
 Binary releases are not tested, they are a result of automated build process.
 
 If you want to build from the source code, simply run `make all` and you will get a small binary, called `edbg`.

@@ -13,6 +13,7 @@ SRCS = \
   target_mchp_cm23.c \
   target_st_stm32g0.c \
   target_gd_gd32f4xx.c \
+  target_nu_m480.c \
 
 HDRS = \
   dap.h \
@@ -41,7 +42,8 @@ else
   endif
 endif
 
-CFLAGS += -W -Wall -Wextra -O2 -std=gnu11
+CFLAGS += -W -Wall -Wextra -O3 -std=gnu11
+CFLAGS += -fno-diagnostics-show-caret
 
 all: $(BIN)
 

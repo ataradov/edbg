@@ -65,12 +65,15 @@ void dap_led(int index, int state);
 void dap_connect(void);
 void dap_disconnect(void);
 void dap_swj_clock(uint32_t clock);
-void dap_transfer_configure(uint8_t idle, uint16_t count, uint16_t retry);
+void dap_transfer_configure(uint8_t idle, uint16_t retry, uint16_t match_retry);
 void dap_swd_configure(uint8_t cfg);
 int dap_info(int info, uint8_t *data, int size);
+void dap_reset_link(void);
+
 void dap_reset_target(void);
 void dap_reset_target_hw(int state);
 void dap_reset_pin(int state);
+
 uint32_t dap_read_reg(uint8_t reg);
 void dap_write_reg(uint8_t reg, uint32_t data);
 uint8_t dap_read_byte(uint32_t addr);
@@ -81,8 +84,18 @@ void dap_write_half(uint32_t addr, uint16_t data);
 void dap_write_word(uint32_t addr, uint32_t data);
 void dap_read_block(uint32_t addr, uint8_t *data, int size);
 void dap_write_block(uint32_t addr, uint8_t *data, int size);
-void dap_reset_link(void);
 uint32_t dap_read_idcode(void);
+
+void dap_read_byte_req(uint32_t addr);
+void dap_read_half_req(uint32_t addr);
+void dap_read_word_req(uint32_t addr);
+void dap_write_byte_req(uint32_t addr, uint32_t data);
+void dap_write_half_req(uint32_t addr, uint32_t data);
+void dap_write_word_req(uint32_t addr, uint32_t data);
+void dap_read_idcode_req(void);
+void dap_readback_req(void);
+void dap_transfer(void);
+uint32_t dap_get_response(int index);
 
 #endif // _DAP_H_
 

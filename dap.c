@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015, Alex Taradov <alex@taradov.com>
+ * Copyright (c) 2013-2021, Alex Taradov <alex@taradov.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -164,9 +164,66 @@ enum
 #define AP_CSW_PROT(x)         ((x) << 24)
 #define AP_CSW_DBGSWENABLE     (1 << 31)
 
+#define TRANSFER_SIZE          16384
+#define TRANSFER_BUF_SIZE      (1024 + 64)
+
+enum
+{
+  TRANSFER_TYPE_READ,
+  TRANSFER_TYPE_WRITE,
+  TRANSFER_TYPE_WRITE_READ,
+  TRANSFER_TYPE_READ_REG,
+  TRANSFER_TYPE_WRITE_REG,
+};
+
+enum
+{
+  TRANSFER_SIZE_BYTE,
+  TRANSFER_SIZE_HALF,
+  TRANSFER_SIZE_WORD,
+  TRANSFER_SIZE_UNKNOWN,
+};
+
+enum
+{
+  OP_CLEAR,
+  OP_SIZE,
+  OP_ADDRESS,
+  OP_SKIP,
+  OP_READ,
+  OP_WRITE,
+};
+
+/*- Types -------------------------------------------------------------------*/
+typedef struct
+{
+  uint8_t  type;
+  uint8_t  size;
+  uint32_t addr;
+  uint32_t data;
+} dap_request_t;
+
+/*- Prototypes --------------------------------------------------------------*/
+static void dap_add_req(int type, int size, uint32_t addr, uint32_t data);
+
 /*- Variables ---------------------------------------------------------------*/
-static bool dap_is_prepared = false;
-static int dap_transfer_size = AP_CSW_SIZE_WORD;
+static dap_request_t dap_request[TRANSFER_SIZE];
+static int dap_request_count = 0;
+
+static uint32_t dap_response[TRANSFER_SIZE];
+static int dap_response_count = 0;
+static int dap_response_size = 0;
+
+static uint8_t dap_buf[TRANSFER_BUF_SIZE];
+static int dap_buf_size = 0;
+
+static uint8_t dap_ops[TRANSFER_BUF_SIZE];
+static int dap_ops_size = 0;
+
+static bool dap_set_address = true;
+static int dap_address_inc = 0;
+static uint32_t dap_address = 0;
+static uint32_t dap_csw;
 
 /*- Implementations ---------------------------------------------------------*/
 
@@ -220,16 +277,16 @@ void dap_swj_clock(uint32_t clock)
 }
 
 //-----------------------------------------------------------------------------
-void dap_transfer_configure(uint8_t idle, uint16_t count, uint16_t retry)
+void dap_transfer_configure(uint8_t idle, uint16_t retry, uint16_t match_retry)
 {
   uint8_t buf[6];
 
   buf[0] = ID_DAP_TRANSFER_CONFIGURE;
   buf[1] = idle;
-  buf[2] = count & 0xff;
-  buf[3] = (count >> 8) & 0xff;
-  buf[4] = retry & 0xff;
-  buf[5] = (retry >> 8) & 0xff;
+  buf[2] = retry & 0xff;
+  buf[3] = (retry >> 8) & 0xff;
+  buf[4] = match_retry & 0xff;
+  buf[5] = (match_retry >> 8) & 0xff;
   dbg_dap_cmd(buf, sizeof(buf), 6);
 
   check(DAP_OK == buf[0], "TRANSFER_CONFIGURE failed");
@@ -264,6 +321,45 @@ int dap_info(int info, uint8_t *data, int size)
     data[rsize] = 0;
 
   return rsize;
+}
+
+//-----------------------------------------------------------------------------
+void dap_reset_link(void)
+{
+  uint8_t buf[128];
+
+  buf[0] = ID_DAP_SWJ_SEQUENCE;
+  buf[1] = (7 + 2 + 7 + 1) * 8;
+  buf[2] = 0xff;
+  buf[3] = 0xff;
+  buf[4] = 0xff;
+  buf[5] = 0xff;
+  buf[6] = 0xff;
+  buf[7] = 0xff;
+  buf[8] = 0xff;
+  buf[9] = 0x9e;
+  buf[10] = 0xe7;
+  buf[11] = 0xff;
+  buf[12] = 0xff;
+  buf[13] = 0xff;
+  buf[14] = 0xff;
+  buf[15] = 0xff;
+  buf[16] = 0xff;
+  buf[17] = 0xff;
+  buf[18] = 0x00;
+
+  dbg_dap_cmd(buf, sizeof(buf), 19);
+  check(DAP_OK == buf[0], "SWJ_SEQUENCE failed");
+
+  dap_read_idcode();
+
+  dap_add_req(TRANSFER_TYPE_WRITE_REG, TRANSFER_SIZE_WORD, SWD_DP_W_ABORT,
+      DP_ABORT_STKCMPCLR | DP_ABORT_STKERRCLR | DP_ABORT_ORUNERRCLR);
+  dap_add_req(TRANSFER_TYPE_WRITE_REG, TRANSFER_SIZE_WORD, SWD_DP_W_SELECT,
+      DP_SELECT_APBANKSEL(0) | DP_SELECT_APSEL(0));
+  dap_add_req(TRANSFER_TYPE_WRITE_REG, TRANSFER_SIZE_WORD, SWD_DP_W_CTRL_STAT,
+      DP_CST_CDBGPWRUPREQ | DP_CST_CSYSPWRUPREQ | DP_CST_MASKLANE(0xf));
+  dap_transfer();
 }
 
 //-----------------------------------------------------------------------------
@@ -322,249 +418,358 @@ void dap_reset_pin(int state)
 }
 
 //-----------------------------------------------------------------------------
-uint32_t dap_read_reg(uint8_t reg)
+static void dap_add_req(int type, int size, uint32_t addr, uint32_t data)
 {
-  uint8_t buf[8];
-
-  buf[0] = ID_DAP_TRANSFER;
-  buf[1] = 0x00; // DAP index
-  buf[2] = 0x01; // Request size
-  buf[3] = reg | DAP_TRANSFER_RnW;
-  dbg_dap_cmd(buf, sizeof(buf), 4);
-
-  if (1 != buf[0] || DAP_TRANSFER_OK != buf[1])
-  {
-    error_exit("invalid response while reading the register 0x%02x (count = %d, value = %d)",
-        reg, buf[0], buf[1]);
-  }
-
-  return ((uint32_t)buf[5] << 24) | ((uint32_t)buf[4] << 16) |
-         ((uint32_t)buf[3] << 8) | (uint32_t)buf[2];
+  dap_request_t req;
+  req.type = type;
+  req.size = size;
+  req.addr = addr;
+  req.data = data;
+  assert(dap_request_count < TRANSFER_SIZE);
+  dap_request[dap_request_count++] = req;
 }
 
 //-----------------------------------------------------------------------------
-void dap_write_reg(uint8_t reg, uint32_t data)
+void dap_read_byte_req(uint32_t addr)
 {
-  uint8_t buf[8];
-
-  buf[0] = ID_DAP_TRANSFER;
-  buf[1] = 0x00; // DAP index
-  buf[2] = 0x01; // Request size
-  buf[3] = reg;
-  buf[4] = data & 0xff;
-  buf[5] = (data >> 8) & 0xff;
-  buf[6] = (data >> 16) & 0xff;
-  buf[7] = (data >> 24) & 0xff;
-  dbg_dap_cmd(buf, sizeof(buf), 8);
-
-  if (1 != buf[0] || DAP_TRANSFER_OK != buf[1])
-  {
-    error_exit("invalid response while writing the register 0x%02x (count = %d, value = %d)",
-        reg, buf[0], buf[1]);
-  }
+  dap_add_req(TRANSFER_TYPE_READ, TRANSFER_SIZE_BYTE, addr, 0);
 }
 
 //-----------------------------------------------------------------------------
-static void dap_set_transfer_size(int size)
+void dap_read_half_req(uint32_t addr)
 {
-  uint32_t csw = AP_CSW_ADDRINC_SINGLE | AP_CSW_DEVICEEN | AP_CSW_PROT(0x23);
+  dap_add_req(TRANSFER_TYPE_READ, TRANSFER_SIZE_HALF, addr, 0);
+}
 
-  if (!dap_is_prepared)
+//-----------------------------------------------------------------------------
+void dap_read_word_req(uint32_t addr)
+{
+  dap_add_req(TRANSFER_TYPE_READ, TRANSFER_SIZE_WORD, addr, 0);
+}
+
+//-----------------------------------------------------------------------------
+void dap_write_byte_req(uint32_t addr, uint32_t data)
+{
+  dap_add_req(TRANSFER_TYPE_WRITE, TRANSFER_SIZE_BYTE, addr, data);
+}
+
+//-----------------------------------------------------------------------------
+void dap_write_half_req(uint32_t addr, uint32_t data)
+{
+  dap_add_req(TRANSFER_TYPE_WRITE, TRANSFER_SIZE_HALF, addr, data);
+}
+
+//-----------------------------------------------------------------------------
+void dap_write_word_req(uint32_t addr, uint32_t data)
+{
+  dap_add_req(TRANSFER_TYPE_WRITE, TRANSFER_SIZE_WORD, addr, data);
+}
+
+//-----------------------------------------------------------------------------
+void dap_read_idcode_req(void)
+{
+  dap_add_req(TRANSFER_TYPE_READ_REG, TRANSFER_SIZE_WORD, SWD_DP_R_IDCODE, 0);
+}
+
+//-----------------------------------------------------------------------------
+void dap_readback_req(void)
+{
+  assert(dap_request_count > 0);
+  assert(dap_request[dap_request_count-1].type == TRANSFER_TYPE_WRITE);
+  dap_request[dap_request_count-1].type = TRANSFER_TYPE_WRITE_READ;
+}
+
+//-----------------------------------------------------------------------------
+static uint32_t to_lane(int size, uint32_t addr, uint32_t data)
+{
+  if (TRANSFER_SIZE_WORD == size)
+    return data;
+  else if (TRANSFER_SIZE_HALF == size)
+    return (data << ((addr & 2) * 8));
+  else if (TRANSFER_SIZE_BYTE == size)
+    return (data << ((addr & 3) * 8));
+  else
+    return 0;
+}
+
+//-----------------------------------------------------------------------------
+static uint32_t from_lane(int size, uint32_t addr, uint32_t data)
+{
+  if (TRANSFER_SIZE_WORD == size)
+    return data;
+  else if (TRANSFER_SIZE_HALF == size)
+    return (data >> ((addr & 2) * 8)) & 0xffff;
+  else if (TRANSFER_SIZE_BYTE == size)
+    return (data >> ((addr & 3) * 8)) & 0xff;
+  else
+    return 0;
+}
+
+//-----------------------------------------------------------------------------
+static void append_word(uint32_t value)
+{
+  dap_buf[dap_buf_size + 0] = value & 0xff;
+  dap_buf[dap_buf_size + 1] = (value >> 8) & 0xff;
+  dap_buf[dap_buf_size + 2] = (value >> 16) & 0xff;
+  dap_buf[dap_buf_size + 3] = (value >> 24) & 0xff;
+  dap_buf_size += sizeof(uint32_t);
+}
+
+//-----------------------------------------------------------------------------
+static bool buffer_request(dap_request_t *req)
+{
+  int packet_size = dbg_get_report_size();
+  int buf_size, ops_size, response_size, address_inc;
+  uint32_t address, csw;
+  bool set_address;
+
+  buf_size      = dap_buf_size;
+  ops_size      = dap_ops_size;
+  response_size = dap_response_size;
+  set_address   = dap_set_address;
+  address_inc   = dap_address_inc;
+  address       = dap_address;
+  csw           = dap_csw;
+
+  if (TRANSFER_TYPE_READ == req->type || TRANSFER_TYPE_WRITE == req->type ||
+      TRANSFER_TYPE_WRITE_READ == req->type)
   {
-    dap_write_reg(SWD_DP_W_ABORT, DP_ABORT_STKCMPCLR | DP_ABORT_STKERRCLR | DP_ABORT_ORUNERRCLR);
-    dap_write_reg(SWD_DP_W_SELECT, DP_SELECT_APBANKSEL(0) | DP_SELECT_APSEL(0));
-    dap_write_reg(SWD_DP_W_CTRL_STAT, DP_CST_CDBGPWRUPREQ | DP_CST_CSYSPWRUPREQ | DP_CST_MASKLANE(0xf));
+    dap_csw = AP_CSW_DBGSWENABLE | AP_CSW_PROT(0x7f);
 
-    dap_write_reg(SWD_AP_CSW, csw | AP_CSW_SIZE_WORD);
+    if (TRANSFER_SIZE_BYTE == req->size)
+    {
+      dap_csw |= AP_CSW_SIZE_BYTE;
+      dap_address_inc = sizeof(uint8_t);
+    }
+    else if (TRANSFER_SIZE_HALF == req->size)
+    {
+      dap_csw |= AP_CSW_SIZE_HALF;
+      dap_address_inc = sizeof(uint16_t);
+    }
+    else if (TRANSFER_SIZE_WORD == req->size)
+    {
+      dap_csw |= AP_CSW_SIZE_WORD;
+      dap_address_inc = sizeof(uint32_t);
+    }
 
-    dap_transfer_size = AP_CSW_SIZE_WORD;
-    dap_is_prepared = true;
+    if (TRANSFER_TYPE_WRITE_READ == req->type)
+      dap_address_inc = 0;
+    else
+      dap_csw |= AP_CSW_ADDRINC_SINGLE;
+
+    if (dap_csw != csw)
+    {
+      dap_buf[dap_buf_size++] = SWD_AP_CSW;
+      append_word(dap_csw);
+      dap_ops[dap_ops_size++] = OP_SIZE;
+    }
+
+    if (dap_set_address || dap_address != req->addr || 0 == (dap_address & 0x3ff))
+    {
+      dap_buf[dap_buf_size++] = SWD_AP_TAR;
+      append_word(req->addr);
+      dap_ops[dap_ops_size++] = OP_ADDRESS;
+      dap_address = req->addr;
+      dap_set_address = false;
+    }
+
+    if (TRANSFER_TYPE_WRITE == req->type || TRANSFER_TYPE_WRITE_READ == req->type)
+    {
+      dap_buf[dap_buf_size++] = SWD_AP_DRW;
+      append_word(to_lane(req->size, req->addr, req->data));
+      dap_ops[dap_ops_size++] = (TRANSFER_TYPE_WRITE == req->type) ? OP_WRITE : OP_SKIP;
+    }
+
+    if (TRANSFER_TYPE_READ == req->type || TRANSFER_TYPE_WRITE_READ == req->type)
+    {
+      dap_buf[dap_buf_size++] = SWD_AP_DRW | DAP_TRANSFER_RnW;
+      dap_ops[dap_ops_size++] = OP_READ;
+      dap_response_size += sizeof(uint32_t);
+    }
+
+    dap_address += dap_address_inc;
+  }
+  else if (TRANSFER_TYPE_WRITE_REG == req->type)
+  {
+    dap_buf[dap_buf_size++] = req->addr;
+    append_word(req->data);
+    dap_ops[dap_ops_size++] = OP_WRITE;
+  }
+  else // TRANSFER_TYPE_READ_REG
+  {
+    dap_buf[dap_buf_size++] = req->addr | DAP_TRANSFER_RnW;
+    dap_ops[dap_ops_size++] = OP_READ;
+    dap_response_size += sizeof(uint32_t);
   }
 
-  if (dap_transfer_size != size)
+  if (dap_buf_size > packet_size || dap_response_size > packet_size)
   {
-    dap_write_reg(SWD_AP_CSW, csw | size);
-    dap_transfer_size = size;
+    dap_buf_size      = buf_size;
+    dap_ops_size      = ops_size;
+    dap_response_size = response_size;
+    dap_set_address   = set_address;
+    dap_address_inc   = address_inc;
+    dap_address       = address;
+    dap_csw           = csw;
+    return false;
   }
+
+  return true;
+}
+
+//-----------------------------------------------------------------------------
+void dap_transfer(void)
+{
+  int count, status;
+  uint32_t *data;
+
+  dap_response_count = 0;
+  dap_csw = 0;
+
+  while (dap_response_count < dap_request_count)
+  {
+    dap_buf[0] = ID_DAP_TRANSFER;
+    dap_buf[1] = 0; // DAP index
+    dap_buf[2] = 0; // Request size (placeholder)
+
+    dap_buf_size = 3;
+    dap_ops_size = 0;
+    dap_response_size = 2; // count and status
+
+    for (int i = dap_response_count; i < dap_request_count; i++)
+    {
+      if (!buffer_request(&dap_request[i]))
+        break;
+    }
+
+    dap_buf[2] = dap_ops_size;
+
+    //verbose("--- %d / %d, req_cnt = %d, resp_cnt = %d, resp_size = %d\n",
+    //  dap_ops_size, dap_buf_size, dap_request_count, dap_response_count, dap_response_size);
+
+    dbg_dap_cmd(dap_buf, sizeof(dap_buf), dap_buf_size);
+
+    count  = dap_buf[0];
+    status = dap_buf[1];
+    data   = (uint32_t *)&dap_buf[2];
+
+    if (dap_ops_size != count || DAP_TRANSFER_OK != status)
+      error_exit("invalid response during transfer (count = %d/%d, status = %d)", count, dap_ops_size, status);
+
+    for (int i = 0; i < count; i++)
+    {
+      dap_request_t *req = &dap_request[dap_response_count];
+
+      if (OP_READ == dap_ops[i])
+      {
+        dap_response[dap_response_count++] = from_lane(req->size, req->addr, *data);
+        data++;
+      }
+      else if (OP_WRITE == dap_ops[i])
+      {
+        dap_response[dap_response_count++] = req->data;
+      }
+    }
+  }
+
+  dap_request_count = 0;
+}
+
+//-----------------------------------------------------------------------------
+uint32_t dap_get_response(int index)
+{
+  assert(index < dap_response_count);
+  return dap_response[index];
 }
 
 //-----------------------------------------------------------------------------
 uint8_t dap_read_byte(uint32_t addr)
 {
-  uint32_t data;
-
-  dap_set_transfer_size(AP_CSW_SIZE_BYTE);
-  dap_write_reg(SWD_AP_TAR, addr);
-  data = dap_read_reg(SWD_AP_DRW);
-
-  return (data >> ((addr & 3) * 8)) & 0xff;
+  dap_read_byte_req(addr);
+  dap_transfer();
+  return dap_response[0];
 }
 
 //-----------------------------------------------------------------------------
 uint16_t dap_read_half(uint32_t addr)
 {
-  uint32_t data;
-
-  dap_set_transfer_size(AP_CSW_SIZE_HALF);
-  dap_write_reg(SWD_AP_TAR, addr);
-  data = dap_read_reg(SWD_AP_DRW);
-
-  return (data >> ((addr & 2) * 8)) & 0xffff;
+  dap_read_half_req(addr);
+  dap_transfer();
+  return dap_response[0];
 }
 
 //-----------------------------------------------------------------------------
 uint32_t dap_read_word(uint32_t addr)
 {
-  dap_set_transfer_size(AP_CSW_SIZE_WORD);
-  dap_write_reg(SWD_AP_TAR, addr);
-  return dap_read_reg(SWD_AP_DRW);
+  dap_read_word_req(addr);
+  dap_transfer();
+  return dap_response[0];
 }
 
 //-----------------------------------------------------------------------------
 void dap_write_byte(uint32_t addr, uint8_t data)
 {
-  dap_set_transfer_size(AP_CSW_SIZE_BYTE);
-  dap_write_reg(SWD_AP_TAR, addr);
-  dap_write_reg(SWD_AP_DRW, (uint32_t)data << ((addr & 3) * 8));
+  dap_write_byte_req(addr, data);
+  dap_transfer();
 }
 
 //-----------------------------------------------------------------------------
 void dap_write_half(uint32_t addr, uint16_t data)
 {
-  dap_set_transfer_size(AP_CSW_SIZE_HALF);
-  dap_write_reg(SWD_AP_TAR, addr);
-  dap_write_reg(SWD_AP_DRW, (uint32_t)data << ((addr & 2) * 8));
+  dap_write_half_req(addr, data);
+  dap_transfer();
 }
 
 //-----------------------------------------------------------------------------
 void dap_write_word(uint32_t addr, uint32_t data)
 {
-  dap_set_transfer_size(AP_CSW_SIZE_WORD);
-  dap_write_reg(SWD_AP_TAR, addr);
-  dap_write_reg(SWD_AP_DRW, data);
+  dap_write_word_req(addr, data);
+  dap_transfer();
 }
 
 //-----------------------------------------------------------------------------
 void dap_read_block(uint32_t addr, uint8_t *data, int size)
 {
-  int max_size = (dbg_get_report_size() - 5) & ~3;
-  int offs = 0;
+  uint32_t *buf = (uint32_t *)data;
+  int count = size / sizeof(uint32_t);
 
-  dap_set_transfer_size(AP_CSW_SIZE_WORD);
+  assert((addr % sizeof(uint32_t)) == 0 && (size % sizeof(uint32_t)) == 0);
 
-  while (size)
+  for (int i = 0; i < count; i++)
   {
-    int align, sz;
-    uint8_t buf[1024];
-
-    align = 0x400 - (addr - (addr & ~0x3ff));
-    sz = (size > max_size) ? max_size : size;
-    sz = (sz > align) ? align : sz;
-
-    dap_write_reg(SWD_AP_TAR, addr);
-
-    buf[0] = ID_DAP_TRANSFER_BLOCK;
-    buf[1] = 0x00; // DAP index
-    buf[2] = (sz / 4) & 0xff;
-    buf[3] = ((sz / 4) >> 8) & 0xff;
-    buf[4] = SWD_AP_DRW | DAP_TRANSFER_RnW | DAP_TRANSFER_APnDP;
-    dbg_dap_cmd(buf, sizeof(buf), 5);
-
-    if (DAP_TRANSFER_OK != buf[2])
-    {
-      error_exit("invalid response while reading the block at 0x%08x (value = %d)",
-          addr, buf[2]);
-    }
-
-    memcpy(&data[offs], &buf[3], sz);
-
-    size -= sz;
-    addr += sz;
-    offs += sz;
+    dap_read_word_req(addr);
+    addr += sizeof(uint32_t);
   }
+
+  dap_transfer();
+
+  for (int i = 0; i < count; i++)
+    buf[i] = dap_response[i];
 }
 
 //-----------------------------------------------------------------------------
 void dap_write_block(uint32_t addr, uint8_t *data, int size)
 {
-  int max_size = (dbg_get_report_size() - 5) & ~3;
-  int offs = 0;
+  uint32_t *buf = (uint32_t *)data;
+  int count = size / sizeof(uint32_t);
 
-  dap_set_transfer_size(AP_CSW_SIZE_WORD);
+  assert((addr % sizeof(uint32_t)) == 0 && (size % sizeof(uint32_t)) == 0);
 
-  while (size)
+  for (int i = 0; i < count; i++)
   {
-    int align, sz;
-    uint8_t buf[1024];
-
-    align = 0x400 - (addr - (addr & ~0x3ff));
-    sz = (size > max_size) ? max_size : size;
-    sz = (sz > align) ? align : sz;
-
-    dap_write_reg(SWD_AP_TAR, addr);
-
-    buf[0] = ID_DAP_TRANSFER_BLOCK;
-    buf[1] = 0x00; // DAP index
-    buf[2] = (sz / 4) & 0xff;
-    buf[3] = ((sz / 4) >> 8) & 0xff;
-    buf[4] = SWD_AP_DRW | DAP_TRANSFER_APnDP;
-    memcpy(&buf[5], &data[offs], sz);
-    dbg_dap_cmd(buf, sizeof(buf), 5 + sz);
-
-    if (DAP_TRANSFER_OK != buf[2])
-    {
-      error_exit("invalid response while writing the block at 0x%08x (value = %d)",
-          addr, buf[2]);
-    }
-
-    size -= sz;
-    addr += sz;
-    offs += sz;
+    dap_write_word_req(addr, buf[i]);
+    addr += sizeof(uint32_t);
   }
-}
 
-//-----------------------------------------------------------------------------
-void dap_reset_link(void)
-{
-  uint8_t buf[128];
-
-  //-------------
-  buf[0] = ID_DAP_SWJ_SEQUENCE;
-  buf[1] = (7 + 2 + 7 + 1) * 8;
-  buf[2] = 0xff;
-  buf[3] = 0xff;
-  buf[4] = 0xff;
-  buf[5] = 0xff;
-  buf[6] = 0xff;
-  buf[7] = 0xff;
-  buf[8] = 0xff;
-  buf[9] = 0x9e;
-  buf[10] = 0xe7;
-  buf[11] = 0xff;
-  buf[12] = 0xff;
-  buf[13] = 0xff;
-  buf[14] = 0xff;
-  buf[15] = 0xff;
-  buf[16] = 0xff;
-  buf[17] = 0xff;
-  buf[18] = 0x00;
-
-  dbg_dap_cmd(buf, sizeof(buf), 19);
-  check(DAP_OK == buf[0], "SWJ_SEQUENCE failed");
-
-  //-------------
-  buf[0] = ID_DAP_TRANSFER;
-  buf[1] = 0; // DAP index
-  buf[2] = 1; // Request size
-  buf[3] = SWD_DP_R_IDCODE | DAP_TRANSFER_RnW;
-  dbg_dap_cmd(buf, sizeof(buf), 4);
-
-  dap_is_prepared = false;
+  dap_transfer();
 }
 
 //-----------------------------------------------------------------------------
 uint32_t dap_read_idcode(void)
 {
-  return dap_read_reg(SWD_DP_R_IDCODE);
+  dap_read_idcode_req();
+  dap_transfer();
+  return dap_response[0];
 }
+
 

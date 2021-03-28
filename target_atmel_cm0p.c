@@ -88,6 +88,8 @@
 #define DEVICE_REV_SHIFT       8
 #define DEVICE_REV_MASK        0xf
 
+#define STATUS_INTERVAL        32 // rows
+
 /*- Types -------------------------------------------------------------------*/
 typedef struct
 {
@@ -266,7 +268,8 @@ static void target_program(void)
     addr += FLASH_ROW_SIZE;
     offs += FLASH_ROW_SIZE;
 
-    verbose(".");
+    if (0 == (row % STATUS_INTERVAL))
+      verbose(".");
   }
 }
 
@@ -279,6 +282,7 @@ static void target_verify(void)
   uint8_t *bufb;
   uint8_t *bufa = target_options.file_data;
   uint32_t size = target_options.file_size;
+  int row = 0;
 
   bufb = buf_alloc(FLASH_ROW_SIZE);
 
@@ -303,7 +307,8 @@ static void target_verify(void)
     offs += FLASH_ROW_SIZE;
     size -= block_size;
 
-    verbose(".");
+    if (0 == (row++ % STATUS_INTERVAL))
+      verbose(".");
   }
 
   buf_free(bufb);
@@ -316,6 +321,7 @@ static void target_read(void)
   uint32_t offs = 0;
   uint8_t *buf = target_options.file_data;
   uint32_t size = target_options.size;
+  int row = 0;
 
   while (size)
   {
@@ -325,7 +331,8 @@ static void target_read(void)
     offs += FLASH_ROW_SIZE;
     size -= FLASH_ROW_SIZE;
 
-    verbose(".");
+    if (0 == (row++ % STATUS_INTERVAL))
+      verbose(".");
   }
 
   save_file(target_options.name, buf, target_options.size);

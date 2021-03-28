@@ -30,9 +30,10 @@
 #define _EDBG_H_
 
 /*- Includes ----------------------------------------------------------------*/
+#include <assert.h>
 #include <stdarg.h>
-#include <stdbool.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 /*- Definitions -------------------------------------------------------------*/
 #define ARRAY_SIZE(x) ((int)(sizeof(x) / sizeof(0[x])))
