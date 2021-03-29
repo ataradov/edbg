@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/ataradov/edbg.svg?branch=master)](https://travis-ci.org/ataradov/edbg)
+[![Build Status](https://github.com/ataradov/edbg/actions/workflows/build.yml/badge.svg)](https://github.com/ataradov/edbg/actions)
 
 # CMSIS-DAP programmer
 
