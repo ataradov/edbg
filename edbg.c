@@ -48,8 +48,6 @@
 #include "dbg.h"
 
 /*- Definitions -------------------------------------------------------------*/
-#define VERSION           "v0.10"
-
 #define MAX_DEBUGGERS     20
 
 #ifndef O_BINARY
@@ -377,7 +375,7 @@ void reconnect_debugger(void)
 //-----------------------------------------------------------------------------
 static void print_help(char *name)
 {
-  message("CMSIS-DAP SWD programmer " VERSION ", built " __DATE__ " " __TIME__ " \n\n");
+  message("CMSIS-DAP SWD programmer. Built " __DATE__ " " __TIME__ ".\n\n");
 
   if (g_target)
   {
