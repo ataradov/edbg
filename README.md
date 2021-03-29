@@ -9,7 +9,8 @@ It was tested with Atmel mEDBG- and EDBG-based boards, Atmel-ICE, LPC-Link2, IBD
 
 ## Installation
 
-Binary releases can be downloaded [here](https://dl.bintray.com/ataradov/edbg/master/).
+For now binary releases can be downloaded from the artifacts section of the GitHub Actions builds
+[here](https://github.com/ataradov/edbg/actions).
 Binary releases are not tested, they are a result of automated build process.
 
 If you want to build from the source code, simply run `make all` and you will get a small binary, called `edbg`.
