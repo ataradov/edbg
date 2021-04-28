@@ -160,7 +160,7 @@ static void reset_with_extension(void)
 {
   dap_reset_target_hw(0);
   sleep_ms(10);
-  reconnect_debugger();
+  dap_reset_link();
 }
 
 //-----------------------------------------------------------------------------

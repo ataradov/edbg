@@ -175,6 +175,7 @@ static void target_select(target_options_t *options)
   bool locked, ctl_lk, ob_lk;
 
   dap_reset_pin(0);
+  dap_reset_link();
   dap_write_word(DHCSR, DHCSR_DBGKEY | DHCSR_DEBUGEN | DHCSR_HALT);
   dap_write_word(DEMCR, DEMCR_VC_CORERESET);
   dap_write_word(AIRCR, AIRCR_VECTKEY | AIRCR_SYSRESETREQ);

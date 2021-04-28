@@ -142,7 +142,7 @@ static void reset_with_extension(void)
 {
   dap_reset_target_hw(0);
   sleep_ms(10);
-  reconnect_debugger();
+  dap_reset_link();
 }
 
 //-----------------------------------------------------------------------------
@@ -380,7 +380,7 @@ static char target_help[] =
   "  This device has one fuses section, which represents a complete User Row (256 bytes).\n";
 
 //-----------------------------------------------------------------------------
-target_ops_t target_atmel_cm4v2_ops = 
+target_ops_t target_atmel_cm4v2_ops =
 {
   .select    = target_select,
   .deselect  = target_deselect,

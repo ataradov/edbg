@@ -51,7 +51,6 @@ void *buf_alloc(int size);
 void buf_free(void *buf);
 int load_file(char *name, uint8_t *data, int size);
 void save_file(char *name, uint8_t *data, int size);
-void reconnect_debugger(void);
 
 #endif // _EDBG_H_
 

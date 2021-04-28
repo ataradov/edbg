@@ -155,7 +155,7 @@ static void target_select(target_options_t *options)
   uint32_t chip_id, chip_exid;
 
   dap_reset_target_hw(1);
-  reconnect_debugger();
+  dap_reset_link();
 
   // Stop the core
   dap_write_word(DHCSR, DHCSR_DBGKEY | DHCSR_DEBUGEN | DHCSR_HALT);
@@ -383,7 +383,7 @@ static char target_help[] =
   "  This device has one fuses section, which represents GPNVM bits.\n";
 
 //-----------------------------------------------------------------------------
-target_ops_t target_atmel_cm4_ops = 
+target_ops_t target_atmel_cm4_ops =
 {
   .select    = target_select,
   .deselect  = target_deselect,
