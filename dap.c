@@ -225,6 +225,8 @@ static int dap_address_inc = 0;
 static uint32_t dap_address = 0;
 static uint32_t dap_csw;
 
+static bool dap_is_prepared = false;
+
 /*- Implementations ---------------------------------------------------------*/
 
 //-----------------------------------------------------------------------------
@@ -328,6 +330,7 @@ void dap_reset_link(void)
 {
   uint8_t buf[128];
 
+  //-------------
   buf[0] = ID_DAP_SWJ_SEQUENCE;
   buf[1] = (7 + 2 + 7 + 1) * 8;
   buf[2] = 0xff;
@@ -351,15 +354,14 @@ void dap_reset_link(void)
   dbg_dap_cmd(buf, sizeof(buf), 19);
   check(DAP_OK == buf[0], "SWJ_SEQUENCE failed");
 
-  dap_read_idcode();
+  //-------------
+  buf[0] = ID_DAP_TRANSFER;
+  buf[1] = 0; // DAP index
+  buf[2] = 1; // Request size
+  buf[3] = SWD_DP_R_IDCODE | DAP_TRANSFER_RnW;
+  dbg_dap_cmd(buf, sizeof(buf), 4);
 
-  dap_add_req(TRANSFER_TYPE_WRITE_REG, TRANSFER_SIZE_WORD, SWD_DP_W_ABORT,
-      DP_ABORT_STKCMPCLR | DP_ABORT_STKERRCLR | DP_ABORT_ORUNERRCLR);
-  dap_add_req(TRANSFER_TYPE_WRITE_REG, TRANSFER_SIZE_WORD, SWD_DP_W_SELECT,
-      DP_SELECT_APBANKSEL(0) | DP_SELECT_APSEL(0));
-  dap_add_req(TRANSFER_TYPE_WRITE_REG, TRANSFER_SIZE_WORD, SWD_DP_W_CTRL_STAT,
-      DP_CST_CDBGPWRUPREQ | DP_CST_CSYSPWRUPREQ | DP_CST_MASKLANE(0xf));
-  dap_transfer();
+  dap_is_prepared = false;
 }
 
 //-----------------------------------------------------------------------------
@@ -415,6 +417,54 @@ void dap_reset_pin(int state)
   buf[5] = 0;
   buf[6] = 0;
   dbg_dap_cmd(buf, sizeof(buf), 7);
+}
+
+//-----------------------------------------------------------------------------
+static void dap_prepare_interface(void)
+{
+  static const struct
+  {
+    int      reg;
+    uint32_t value;
+  } seq [] =
+  {
+    { SWD_DP_W_ABORT, DP_ABORT_STKCMPCLR | DP_ABORT_STKERRCLR | DP_ABORT_ORUNERRCLR },
+    { SWD_DP_W_SELECT, DP_SELECT_APBANKSEL(0) | DP_SELECT_APSEL(0) },
+    { SWD_DP_W_CTRL_STAT, DP_CST_CDBGPWRUPREQ | DP_CST_CSYSPWRUPREQ | DP_CST_MASKLANE(0xf) },
+    { -1, 0 },
+  };
+  uint8_t buf[64];
+  int size = 3;
+  int cnt;
+
+  if (dap_is_prepared)
+    return;
+
+  buf[0] = ID_DAP_TRANSFER;
+  buf[1] = 0; // DAP index
+  buf[2] = 0; // Request size (placeholder)
+
+  for (cnt = 0; seq[cnt].reg != -1; cnt++)
+  {
+    buf[size+0] = seq[cnt].reg;
+    buf[size+1] = seq[cnt].value & 0xff;
+    buf[size+2] = (seq[cnt].value >> 8) & 0xff;
+    buf[size+3] = (seq[cnt].value >> 16) & 0xff;
+    buf[size+4] = (seq[cnt].value >> 24) & 0xff;
+    size += 5;
+  }
+
+  buf[2] = cnt; // Request size
+
+  dbg_dap_cmd(buf, sizeof(buf), size);
+
+  if (cnt != buf[0] || DAP_TRANSFER_OK != buf[1])
+  {
+    error_exit("invalid response while preparing the interface (count = %d/%d, value = %d)",
+        buf[0], cnt, buf[1]);
+  }
+
+  dap_is_prepared = true;
 }
 
 //-----------------------------------------------------------------------------
@@ -622,6 +672,8 @@ void dap_transfer(void)
 {
   int count, status;
   uint32_t *data;
+
+  dap_prepare_interface();
 
   dap_response_count = 0;
   dap_csw = 0;
