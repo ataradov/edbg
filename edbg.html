@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>edbg</title>
+  </head>
+  <body>
+    <button id="edbg-device-refresh" disabled="disabled">🗘</button>
+
+    <select id="edbg-device-list" disabled="disabled">
+      <option value="">(devices need to be refreshed first)</option>
+    </select>
+
+    <input id="edbg-parameters" type="text" placeholder="--target samd11 --verbose --read --file file.bin" disabled="disabled" />
+    <button id="edbg-run" disabled="disabled">▶</button>
+
+    <div id="edbg-output"></div>
+
+    <script type='text/javascript'>
+let $deviceRefreshButton = document.getElementById("edbg-device-refresh");
+let $deviceListSelect = document.getElementById("edbg-device-list");
+let $parametersInput = document.getElementById("edbg-parameters");
+let $runButton = document.getElementById("edbg-run");
+let $outputDiv = document.getElementById("edbg-output");
+
+
+const disableUi = () => {
+  $deviceRefreshButton.setAttribute("disabled", "disabled");
+  $deviceListSelect.setAttribute("disabled", "disabled");
+  $parametersInput.setAttribute("disabled", "disabled");
+  $runButton.setAttribute("disabled", "disabled");
+};
+
+const enableUi = () => {
+  $deviceRefreshButton.removeAttribute("disabled");
+  $deviceListSelect.removeAttribute("disabled");
+  $parametersInput.removeAttribute("disabled");
+  $runButton.removeAttribute("disabled");
+};
+
+/* @see https://stackoverflow.com/a/3955238
+ *
+ * @author Gabriel McAdams
+ * @author FZs
+ */
+const removeAllChildren = ($element) => {
+  while ($element.firstChild) {
+    $element.removeChild($element.lastChild);
+  }
+};
+
+
+
+var Module = {
+  onRuntimeInitialized: async () => {
+    console.log("Module runtime initialized");
+    enableUi();
+    //await Module.callMain(["--list"]);
+  },
+
+  print: function (text) {
+    if (arguments.length > 1) {
+      text = Array.prototype.slice.call(arguments).join(' ');
+    }
+
+    let $message = document.createElement("div");
+    $message.setAttribute("class", "edbg-output-message");
+    $message.appendChild(document.createTextNode(text));
+    $outputDiv.appendChild($message);
+  },
+
+  printErr: function (text) {
+    if (arguments.length > 1) {
+      text = Array.prototype.slice.call(arguments).join(' ');
+    }
+
+    let $error = document.createElement("div");
+    $error.setAttribute("class", "edbg-output-error");
+    $error.appendChild(document.createTextNode("Error: " + text));
+    $outputDiv.appendChild($error);
+  },
+};
+
+
+
+/* Sends a Uint8Array as download to the user
+ *
+ * @author Stefan
+ * @author drivfe
+ *
+ * @see https://stackoverflow.com/a/33622881
+ */
+const downloadBlob = (data, fileName, mimeType) => {
+  let blob, url;
+  blob = new Blob([data], {
+    type: mimeType
+  });
+  url = window.URL.createObjectURL(blob);
+
+  const downloadURL = (data, fileName) => {
+    let a = document.createElement("a");
+    a.href = data;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.style = 'display: none';
+    a.click();
+    a.remove();
+  };
+
+  downloadURL(url, fileName);
+  setTimeout(function() {
+    return window.URL.revokeObjectURL(url);
+  }, 1000);
+};
+
+
+
+$deviceRefreshButton.onclick = async () => {
+  removeAllChildren($outputDiv);
+
+  try {
+    await Module.edbg.refreshDevices();
+
+    removeAllChildren($deviceListSelect);
+
+    Module.edbg.devices.forEach((device, deviceIdx) => {
+      let $option = document.createElement("option");
+      $option.setAttribute("value", deviceIdx);
+      $option.appendChild(document.createTextNode(device.productName));
+      $deviceListSelect.appendChild($option);
+    });
+
+  } catch (e) {
+    console.error("Caught unexpected exception while refreshing devices", e);
+    Module.printErr(e.message);
+  }
+};
+
+$runButton.onclick = async () => {
+  removeAllChildren($outputDiv);
+  disableUi();
+
+  try {
+    const deviceIdx = $deviceListSelect.value;
+
+    if ('' === deviceIdx) {
+      throw new Error("You have to refresh (🗘) the device list first");
+    }
+    if (!Module.edbg.devices.hasOwnProperty(deviceIdx)) {
+      throw new Error("Cannot find device `" + deviceIdx + "', please try refreshing device list!");
+    }
+
+    /* @warning This will fail when presented an with an argument
+     *     like {@code -f "my file"}
+     */
+    const parameters = (() => {
+      if ('' === $parametersInput.value) {
+//        return ["--help"];
+//        return ["--target", "samd11", "--verbose", "--read", "--file", "file.bin"];
+        return ["--target", "samd21", "--verbose", "--read", "--file", "file.bin"];
+      }
+      return $parametersInput.value.split(" ");
+    })();
+
+    await Module.callMain(parameters);
+    await Module.edbg.running;
+
+    const fileContent = FS.readFile("file.bin", {
+      "encoding": "binary",
+    });
+    downloadBlob(fileContent, "file.bin", "application/octet-stream");
+
+  } catch (e) {
+    console.error("Caught unexpected exception while running edbg", e);
+    Module.printErr(e.message);
+  }
+};
+
+    </script>
+    <script async type="text/javascript" src="edbg.js"></script>
+  </body>
+</html>
+

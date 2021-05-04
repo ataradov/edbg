@@ -1,0 +1,35 @@
+SOURCES =			\
+	dap.c			\
+	dbg_webhid.c		\
+	edbg.c			\
+	target.c		\
+	target_atmel_cm0p.c	\
+	target_atmel_cm3.c	\
+	target_atmel_cm4.c	\
+	target_atmel_cm7.c	\
+	target_atmel_cm4v2.c	\
+	target_mchp_cm23.c	\
+	target_st_stm32g0.c	\
+	target_gd_gd32f4xx.c	\
+	target_nu_m480.c	\
+
+
+.PHONY: all
+all: clean build
+
+
+.PHONY: clean
+clean:
+	@if [ -f 'edbg.js' ]; then	\
+		rm 'edbg.js';		\
+	fi
+
+	@if [ -f 'edbg.wasm' ]; then	\
+		rm 'edbg.wasm';		\
+	fi
+
+
+.PHONY: build
+build:
+	emcc -o 'edbg.js' --post-js 'dbg_webhid.js' -s INVOKE_RUN=0 -s 'EXPORTED_RUNTIME_METHODS=["callMain", "cwrap"]' -s 'EXPORTED_FUNCTIONS=["_main", "_dbg_webhid_set_debugger"]' -O3 -s ASYNCIFY=1 -s 'ASYNCIFY_IMPORTS=["dbg_enumerate", "dbg_dap_cmd"]' $(SOURCES)
+
