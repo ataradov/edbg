@@ -534,7 +534,7 @@ static bool buffer_request(dap_request_t *req)
   if (TRANSFER_TYPE_READ == req->type || TRANSFER_TYPE_WRITE == req->type ||
       TRANSFER_TYPE_WRITE_READ == req->type)
   {
-    dap_csw = AP_CSW_DBGSWENABLE | AP_CSW_PROT(0x7f);
+    dap_csw = AP_CSW_DEVICEEN | AP_CSW_DBGSWENABLE | AP_CSW_PROT(0x23);
 
     if (TRANSFER_SIZE_BYTE == req->size)
     {

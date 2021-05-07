@@ -147,6 +147,7 @@ static uint32_t NVMCTRL_ADDR;
 static void reset_with_extension(void)
 {
   dap_reset_target_hw(0);
+  sleep_ms(10);
   dap_reset_link();
   dap_write_byte(DSU_STATUSA, DSU_STATUSA_CRSTEXT);
 }
