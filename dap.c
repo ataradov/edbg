@@ -54,6 +54,7 @@ enum
   ID_DAP_SWJ_CLOCK          = 0x11,
   ID_DAP_SWJ_SEQUENCE       = 0x12,
   ID_DAP_SWD_CONFIGURE      = 0x13,
+  ID_DAP_SWD_SEQUENCE       = 0x1d,
   ID_DAP_JTAG_SEQUENCE      = 0x14,
   ID_DAP_JTAG_CONFIGURE     = 0x15,
   ID_DAP_JTAG_IDCODE        = 0x16,
@@ -123,6 +124,13 @@ enum
   SWD_AP_BASE = 0x08 | DAP_TRANSFER_APnDP, // 0xf8
   SWD_AP_IDR  = 0x0c | DAP_TRANSFER_APnDP, // 0xfc
 };
+
+#define JTAG_SEQUENCE_COUNT(x) (((x) == 64) ? 0 : (x))
+#define JTAG_SEQUENCE_TMS      (1 << 6)
+#define JTAG_SEQUENCE_TDO      (1 << 7)
+
+#define SWD_SEQUENCE_COUNT(x)  (((x) == 64) ? 0 : (x))
+#define SWD_SEQUENCE_DIN       (1 << 7)
 
 #define DP_ABORT_DAPABORT      (1 << 0)
 #define DP_ABORT_STKCMPCLR     (1 << 1)
@@ -207,6 +215,8 @@ typedef struct
 static void dap_add_req(int type, int size, uint32_t addr, uint32_t data);
 
 /*- Variables ---------------------------------------------------------------*/
+static int dap_interface = DAP_INTERFACE_NONE;
+
 static dap_request_t dap_request[TRANSFER_SIZE];
 static int dap_request_count = 0;
 
@@ -225,6 +235,8 @@ static int dap_address_inc = 0;
 static uint32_t dap_address = 0;
 static uint32_t dap_csw;
 
+static int dap_jtag_index = 0;
+
 /*- Implementations ---------------------------------------------------------*/
 
 //-----------------------------------------------------------------------------
@@ -241,15 +253,18 @@ void dap_led(int index, int state)
 }
 
 //-----------------------------------------------------------------------------
-void dap_connect(void)
+void dap_connect(int interface)
 {
   uint8_t buf[2];
+  int cap = (DAP_INTERFACE_SWD == interface) ? DAP_CAP_SWD : DAP_CAP_JTAG;
 
   buf[0] = ID_DAP_CONNECT;
-  buf[1] = DAP_CAP_SWD;
+  buf[1] = cap;
   dbg_dap_cmd(buf, sizeof(buf), 2);
 
-  check(DAP_CAP_SWD == buf[0], "DAP_CONNECT failed");
+  check(buf[0] == cap, "DAP_CONNECT failed");
+
+  dap_interface = interface;
 }
 
 //-----------------------------------------------------------------------------
@@ -259,6 +274,8 @@ void dap_disconnect(void)
 
   buf[0] = ID_DAP_DISCONNECT;
   dbg_dap_cmd(buf, sizeof(buf), 1);
+
+  dap_interface = DAP_INTERFACE_NONE;
 }
 
 //-----------------------------------------------------------------------------
@@ -293,7 +310,7 @@ void dap_transfer_configure(uint8_t idle, uint16_t retry, uint16_t match_retry)
 }
 
 //-----------------------------------------------------------------------------
-void dap_swd_configure(uint8_t cfg)
+void dap_swd_configure(int cfg)
 {
   uint8_t buf[2];
 
@@ -302,6 +319,26 @@ void dap_swd_configure(uint8_t cfg)
   dbg_dap_cmd(buf, sizeof(buf), 2);
 
   check(DAP_OK == buf[0], "SWD_CONFIGURE failed");
+}
+
+//-----------------------------------------------------------------------------
+void dap_jtag_configure(int count, int *ir_len)
+{
+  uint8_t buf[32];
+
+  buf[0] = ID_DAP_JTAG_CONFIGURE;
+  buf[1] = count;
+  for (int i = 0; i < count; i++)
+    buf[2+i] = ir_len[i];
+  dbg_dap_cmd(buf, sizeof(buf), 2 + count);
+
+  check(DAP_OK == buf[0], "JTAG_CONFIGURE failed");
+}
+
+//-----------------------------------------------------------------------------
+void dap_jtag_set_index(int index)
+{
+  dap_jtag_index = index;
 }
 
 //-----------------------------------------------------------------------------
@@ -326,32 +363,58 @@ int dap_info(int info, uint8_t *data, int size)
 //-----------------------------------------------------------------------------
 void dap_reset_link(void)
 {
-  uint8_t buf[128];
+  uint8_t buf[32];
 
-  buf[0] = ID_DAP_SWJ_SEQUENCE;
-  buf[1] = (7 + 2 + 7 + 1) * 8;
-  buf[2] = 0xff;
-  buf[3] = 0xff;
-  buf[4] = 0xff;
-  buf[5] = 0xff;
-  buf[6] = 0xff;
-  buf[7] = 0xff;
-  buf[8] = 0xff;
-  buf[9] = 0x9e;
-  buf[10] = 0xe7;
-  buf[11] = 0xff;
-  buf[12] = 0xff;
-  buf[13] = 0xff;
-  buf[14] = 0xff;
-  buf[15] = 0xff;
-  buf[16] = 0xff;
-  buf[17] = 0xff;
-  buf[18] = 0x00;
+  if (DAP_INTERFACE_SWD == dap_interface)
+  {
+    buf[0] = ID_DAP_SWJ_SEQUENCE;
+    buf[1] = (7 + 2 + 7 + 1) * 8;
+    buf[2] = 0xff;
+    buf[3] = 0xff;
+    buf[4] = 0xff;
+    buf[5] = 0xff;
+    buf[6] = 0xff;
+    buf[7] = 0xff;
+    buf[8] = 0xff;
+    buf[9] = 0x9e;
+    buf[10] = 0xe7;
+    buf[11] = 0xff;
+    buf[12] = 0xff;
+    buf[13] = 0xff;
+    buf[14] = 0xff;
+    buf[15] = 0xff;
+    buf[16] = 0xff;
+    buf[17] = 0xff;
+    buf[18] = 0x00;
 
-  dbg_dap_cmd(buf, sizeof(buf), 19);
-  check(DAP_OK == buf[0], "SWJ_SEQUENCE failed");
+    dbg_dap_cmd(buf, sizeof(buf), 19);
+    check(DAP_OK == buf[0], "SWJ_SEQUENCE failed");
 
-  dap_read_idcode();
+    dap_read_idcode();
+  }
+  else if (DAP_INTERFACE_JTAG == dap_interface)
+  {
+    buf[0] = ID_DAP_SWJ_SEQUENCE;
+    buf[1] = (7 + 2 + 1 + 1) * 8;
+    buf[2] = 0xff;
+    buf[3] = 0xff;
+    buf[4] = 0xff;
+    buf[5] = 0xff;
+    buf[6] = 0xff;
+    buf[7] = 0xff;
+    buf[8] = 0xff;
+    buf[9] = 0x3c;
+    buf[10] = 0xe7;
+    buf[11] = 0xff;
+    buf[12] = 0x00;
+
+    dbg_dap_cmd(buf, sizeof(buf), 13);
+    check(DAP_OK == buf[0], "SWJ_SEQUENCE failed");
+  }
+  else
+  {
+    error_exit("no interface selected in dap_reset_link()");
+  }
 
   dap_add_req(TRANSFER_TYPE_WRITE_REG, TRANSFER_SIZE_WORD, SWD_DP_W_ABORT,
       DP_ABORT_STKCMPCLR | DP_ABORT_STKERRCLR | DP_ABORT_ORUNERRCLR);
@@ -534,7 +597,7 @@ static bool buffer_request(dap_request_t *req)
   if (TRANSFER_TYPE_READ == req->type || TRANSFER_TYPE_WRITE == req->type ||
       TRANSFER_TYPE_WRITE_READ == req->type)
   {
-    dap_csw = AP_CSW_DEVICEEN | AP_CSW_DBGSWENABLE | AP_CSW_PROT(0x23);
+    dap_csw = AP_CSW_DBGSWENABLE | AP_CSW_PROT(0x23);
 
     if (TRANSFER_SIZE_BYTE == req->size)
     {
@@ -629,7 +692,7 @@ void dap_transfer(void)
   while (dap_response_count < dap_request_count)
   {
     dap_buf[0] = ID_DAP_TRANSFER;
-    dap_buf[1] = 0; // DAP index
+    dap_buf[1] = dap_jtag_index;
     dap_buf[2] = 0; // Request size (placeholder)
 
     dap_buf_size = 3;
@@ -767,9 +830,147 @@ void dap_write_block(uint32_t addr, uint8_t *data, int size)
 //-----------------------------------------------------------------------------
 uint32_t dap_read_idcode(void)
 {
-  dap_read_idcode_req();
-  dap_transfer();
-  return dap_response[0];
+  if (DAP_INTERFACE_SWD == dap_interface)
+  {
+    dap_read_idcode_req();
+    dap_transfer();
+    return dap_response[0];
+  }
+  else if (DAP_INTERFACE_JTAG == dap_interface)
+  {
+    uint8_t buf[16];
+
+    buf[0] = ID_DAP_JTAG_IDCODE;
+    buf[1] = dap_jtag_index;
+
+    dbg_dap_cmd(buf, sizeof(buf), 2);
+    check(DAP_OK == buf[0], "JTAG_IDCODE failed");
+
+    return *((uint32_t *)&buf[1]);
+  }
+
+  return 0;
+}
+
+//-----------------------------------------------------------------------------
+int dap_jtag_scan_chain(uint32_t *idcode, int size, int *ir_len)
+{
+  uint8_t buf[64];
+  int count = 0;
+  int length = 0;
+
+  buf[0] = ID_DAP_JTAG_SEQUENCE;
+  buf[1] = 4;
+
+  // -> Test-Logic-Reset
+  buf[2] = JTAG_SEQUENCE_COUNT(16) | JTAG_SEQUENCE_TMS;
+  buf[3] = 0xff;
+  buf[4] = 0xff;
+
+  // -> Run-Test/Idle
+  buf[5] = JTAG_SEQUENCE_COUNT(1);
+  buf[6] = 0x01;
+
+  // -> Select-DR-Scan
+  buf[7] = JTAG_SEQUENCE_COUNT(1) | JTAG_SEQUENCE_TMS;
+  buf[8] = 0x01;
+
+  // -> Shift-DR
+  buf[9] = JTAG_SEQUENCE_COUNT(2);
+  buf[10] = 0x03;
+
+  dbg_dap_cmd(buf, sizeof(buf), 11);
+  check(DAP_OK == buf[0], "JTAG_SEQUENCE failed");
+
+  for (int i = 0; i < size; i++)
+  {
+    buf[0] = ID_DAP_JTAG_SEQUENCE;
+    buf[1] = 1;
+    buf[2] = JTAG_SEQUENCE_COUNT(32) | JTAG_SEQUENCE_TDO;
+    buf[3] = 0;
+    buf[4] = 0;
+    buf[5] = 0;
+    buf[6] = 0;
+
+    dbg_dap_cmd(buf, sizeof(buf), 7);
+    check(DAP_OK == buf[0], "JTAG_SEQUENCE failed");
+
+    uint32_t id = *((uint32_t *)&buf[1]);
+
+    if (id)
+      idcode[count++] = id;
+    else
+      break;
+  }
+
+  buf[0] = ID_DAP_JTAG_SEQUENCE;
+  buf[1] = 2;
+
+  // -> Update-DR
+  buf[2] = JTAG_SEQUENCE_COUNT(2) | JTAG_SEQUENCE_TMS;
+  buf[3] = 0x03;
+
+  // -> Run-Test/Idle
+  buf[4] = JTAG_SEQUENCE_COUNT(1);
+  buf[5] = 0x01;
+
+  dbg_dap_cmd(buf, sizeof(buf), 6);
+  check(DAP_OK == buf[0], "JTAG_SEQUENCE failed");
+
+  if (NULL == ir_len)
+    return count;
+
+  buf[0] = ID_DAP_JTAG_SEQUENCE;
+  buf[1] = 6;
+
+  // -> Select-IR-Scan
+  buf[2] = JTAG_SEQUENCE_COUNT(2) | JTAG_SEQUENCE_TMS;
+  buf[3] = 0x03;
+
+  // -> Shift-IR
+  buf[4] = JTAG_SEQUENCE_COUNT(2);
+  buf[5] = 0x03;
+
+  // -> Shift-IR
+  buf[6] = JTAG_SEQUENCE_COUNT(64);
+  buf[7] = 0x00;
+  buf[8] = 0x00;
+  buf[9] = 0x00;
+  buf[10] = 0x00;
+  buf[11] = 0x00;
+  buf[12] = 0x00;
+  buf[13] = 0x00;
+  buf[14] = 0x00;
+
+  // -> Shift-IR
+  buf[15] = JTAG_SEQUENCE_COUNT(64) | JTAG_SEQUENCE_TDO;
+  buf[16] = 0xff;
+  buf[17] = 0xff;
+  buf[18] = 0xff;
+  buf[19] = 0xff;
+  buf[20] = 0xff;
+  buf[21] = 0xff;
+  buf[22] = 0xff;
+  buf[23] = 0xff;
+
+  // -> Update-IR
+  buf[24] = JTAG_SEQUENCE_COUNT(2) | JTAG_SEQUENCE_TMS;
+  buf[25] = 0x03;
+
+  // -> Run-Test/Idle
+  buf[26] = JTAG_SEQUENCE_COUNT(1);
+  buf[27] = 0x01;
+
+  dbg_dap_cmd(buf, sizeof(buf), 28);
+  check(DAP_OK == buf[0], "JTAG_SEQUENCE failed");
+
+  uint64_t ir = *((uint64_t *)&buf[1]);
+
+  for (length = 0; length < 64 && (ir & (1 << length)) == 0; length++);
+
+  *ir_len = length;
+
+  return count;
 }
 
 

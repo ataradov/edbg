@@ -60,13 +60,22 @@ enum
   DAP_CAP_SWO_STREAMING  = (1 << 6),
 };
 
+enum
+{
+  DAP_INTERFACE_NONE,
+  DAP_INTERFACE_SWD,
+  DAP_INTERFACE_JTAG,
+};
+
 /*- Prototypes --------------------------------------------------------------*/
 void dap_led(int index, int state);
-void dap_connect(void);
+void dap_connect(int interface);
 void dap_disconnect(void);
 void dap_swj_clock(uint32_t clock);
 void dap_transfer_configure(uint8_t idle, uint16_t retry, uint16_t match_retry);
-void dap_swd_configure(uint8_t cfg);
+void dap_swd_configure(int cfg);
+void dap_jtag_configure(int count, int *ir_len);
+void dap_jtag_set_index(int index);
 int dap_info(int info, uint8_t *data, int size);
 void dap_reset_link(void);
 
@@ -84,7 +93,6 @@ void dap_write_half(uint32_t addr, uint16_t data);
 void dap_write_word(uint32_t addr, uint32_t data);
 void dap_read_block(uint32_t addr, uint8_t *data, int size);
 void dap_write_block(uint32_t addr, uint8_t *data, int size);
-uint32_t dap_read_idcode(void);
 
 void dap_read_byte_req(uint32_t addr);
 void dap_read_half_req(uint32_t addr);
@@ -96,6 +104,9 @@ void dap_read_idcode_req(void);
 void dap_readback_req(void);
 void dap_transfer(void);
 uint32_t dap_get_response(int index);
+
+uint32_t dap_read_idcode(void);
+int dap_jtag_scan_chain(uint32_t *idcode, int size, int *ir_len);
 
 #endif // _DAP_H_
 

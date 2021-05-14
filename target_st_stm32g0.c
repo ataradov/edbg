@@ -177,7 +177,8 @@ static void target_select(target_options_t *options)
   uint32_t idcode, flash_size;
   bool locked;
 
-  dap_connect();
+  dap_disconnect();
+  dap_connect(DAP_INTERFACE_SWD);
   dap_reset_pin(0);
   dap_reset_link();
 
