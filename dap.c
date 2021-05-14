@@ -253,10 +253,10 @@ void dap_led(int index, int state)
 }
 
 //-----------------------------------------------------------------------------
-void dap_connect(int interface)
+void dap_connect(int interf)
 {
   uint8_t buf[2];
-  int cap = (DAP_INTERFACE_SWD == interface) ? DAP_CAP_SWD : DAP_CAP_JTAG;
+  int cap = (DAP_INTERFACE_SWD == interf) ? DAP_CAP_SWD : DAP_CAP_JTAG;
 
   buf[0] = ID_DAP_CONNECT;
   buf[1] = cap;
@@ -264,7 +264,7 @@ void dap_connect(int interface)
 
   check(buf[0] == cap, "DAP_CONNECT failed");
 
-  dap_interface = interface;
+  dap_interface = interf;
 }
 
 //-----------------------------------------------------------------------------
