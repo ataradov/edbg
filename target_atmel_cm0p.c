@@ -148,6 +148,10 @@ static device_t devices[] =
   { 0x1081002C, "samr35", "SAM R35J17B",  128*1024 },
   { 0x1081002D, "samr35", "SAM R35J16B",   64*1024 },
   { 0x10011064, "samda1", "SAM DA1J16B",   64*1024 },
+  { 0x11070000, "pic32cm", "PIC32CM1216MC00032",   128*1024 },
+  { 0x11070001, "pic32cm", "PIC32CM6408MC00032",    64*1024 },
+  { 0x11070006, "pic32cm", "PIC32CM1216MC00048",   128*1024 },
+  { 0x11070007, "pic32cm", "PIC32CM6408MC00048",    64*1024 },
 };
 
 static device_t target_device;

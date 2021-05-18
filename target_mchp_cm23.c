@@ -129,6 +129,7 @@ static device_t devices[] =
 {
   { 0x20840003, "saml10", "SAM L10D16A",  64*1024, false },
   { 0x20840000, "saml10", "SAM L10E16A",  64*1024, false },
+  { 0x20830003, "saml11", "SAM L11D16A",  64*1024, true  },
   { 0x20830000, "saml11", "SAM L11E16A",  64*1024, true  },
 };
 
