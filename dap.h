@@ -106,7 +106,17 @@ void dap_transfer(void);
 uint32_t dap_get_response(int index);
 
 uint32_t dap_read_idcode(void);
-int dap_jtag_scan_chain(uint32_t *idcode, int size, int *ir_len);
+
+void dap_jtag_clk(int tdi, int tms);
+void dap_jtag_clk_read(int tdi, int tms);
+void dap_jtag_flush(void);
+void dap_jtag_read(int offset, uint8_t *data, int size);
+void dap_jtag_idle(int count);
+void dap_jtag_reset(void);
+void dap_jtag_write_ir(int ir, int size);
+void dap_jtag_write_dr(uint8_t *data, int size);
+void dap_jtag_read_dr(uint8_t *data, int size);
+int dap_jtag_scan_chain(uint32_t *idcode, int size);
 
 #endif // _DAP_H_
 

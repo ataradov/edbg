@@ -30,7 +30,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <windows.h>
-#include <setupapi.h>          
+#include <setupapi.h>
 // NOTE: Different versions of MinGW seem to place those files in differnet
 //       locations. If you see build errors here, then use includes with
 //       'ddk/' prefix. The no-prefix version seems to be the best moving
@@ -52,7 +52,7 @@
 
 /*- Variables ---------------------------------------------------------------*/
 static HANDLE debugger_handle = INVALID_HANDLE_VALUE;
-static uint8_t hid_buffer[1024 + 1];
+static uint8_t hid_buffer[DBG_MAX_EP_SIZE + 1];
 static int report_size = 0;
 
 /*- Implementations ---------------------------------------------------------*/

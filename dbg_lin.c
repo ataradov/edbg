@@ -46,7 +46,7 @@
 
 /*- Variables ---------------------------------------------------------------*/
 static int debugger_fd = -1;
-static uint8_t hid_buffer[1024 + 1];
+static uint8_t hid_buffer[DBG_MAX_EP_SIZE + 1];
 static int report_size = 0;
 
 /*- Implementations ---------------------------------------------------------*/

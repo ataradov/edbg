@@ -173,7 +173,10 @@ enum
 #define AP_CSW_DBGSWENABLE     (1 << 31)
 
 #define TRANSFER_SIZE          16384
-#define TRANSFER_BUF_SIZE      (1024 + 64)
+#define TRANSFER_BUF_SIZE      (DBG_MAX_EP_SIZE + 64)
+
+#define JTAG_TRANSFER_SIZE     65536
+#define JTAG_RESPONSE_BUF_SIZE (JTAG_TRANSFER_SIZE / 8)
 
 enum
 {
@@ -211,6 +214,12 @@ typedef struct
   uint32_t data;
 } dap_request_t;
 
+typedef struct
+{
+  uint8_t  opt;
+  uint8_t  tdi;
+} dap_jtag_request_t;
+
 /*- Prototypes --------------------------------------------------------------*/
 static void dap_add_req(int type, int size, uint32_t addr, uint32_t data);
 
@@ -236,6 +245,12 @@ static uint32_t dap_address = 0;
 static uint32_t dap_csw;
 
 static int dap_jtag_index = 0;
+
+static dap_jtag_request_t dap_jtag_request[JTAG_TRANSFER_SIZE];
+static int dap_jtag_request_count = 0;
+
+static uint8_t dap_jtag_response_buf[JTAG_RESPONSE_BUF_SIZE];
+static int dap_jtag_response_count = 0;
 
 /*- Implementations ---------------------------------------------------------*/
 
@@ -853,122 +868,223 @@ uint32_t dap_read_idcode(void)
 }
 
 //-----------------------------------------------------------------------------
-int dap_jtag_scan_chain(uint32_t *idcode, int size, int *ir_len)
+static void dap_jtag_add_req(int tdi, int tms, int tdo)
 {
-  uint8_t buf[64];
-  int count = 0;
-  int length = 0;
+  dap_jtag_request_t req;
+  req.tdi = tdi ? 1 : 0;
+  req.opt = (tms ? JTAG_SEQUENCE_TMS : 0) | (tdo ? JTAG_SEQUENCE_TDO : 0);
+  assert(dap_request_count < TRANSFER_SIZE);
+  dap_jtag_request[dap_jtag_request_count++] = req;
+}
 
-  buf[0] = ID_DAP_JTAG_SEQUENCE;
-  buf[1] = 4;
+//-----------------------------------------------------------------------------
+void dap_jtag_clk(int tdi, int tms)
+{
+  dap_jtag_add_req(tdi, tms, 0);
+}
 
-  // -> Test-Logic-Reset
-  buf[2] = JTAG_SEQUENCE_COUNT(16) | JTAG_SEQUENCE_TMS;
-  buf[3] = 0xff;
-  buf[4] = 0xff;
+//-----------------------------------------------------------------------------
+void dap_jtag_clk_read(int tdi, int tms)
+{
+  dap_jtag_add_req(tdi, tms, 1);
+}
 
-  // -> Run-Test/Idle
-  buf[5] = JTAG_SEQUENCE_COUNT(1);
-  buf[6] = 0x01;
+//-----------------------------------------------------------------------------
+void dap_jtag_flush(void)
+{
+  uint8_t buf[DBG_MAX_EP_SIZE];
+  int tdo_size[DBG_MAX_EP_SIZE / 2];
+  int tdo_count, req_count, req_size, index, remaining;
 
-  // -> Select-DR-Scan
-  buf[7] = JTAG_SEQUENCE_COUNT(1) | JTAG_SEQUENCE_TMS;
-  buf[8] = 0x01;
+  if (0 == dap_jtag_request_count)
+    return;
 
-  // -> Shift-DR
-  buf[9] = JTAG_SEQUENCE_COUNT(2);
-  buf[10] = 0x03;
+  memset(dap_jtag_response_buf, 0, sizeof(dap_jtag_response_buf));
+  dap_jtag_response_count = 0;
 
-  dbg_dap_cmd(buf, sizeof(buf), 11);
-  check(DAP_OK == buf[0], "JTAG_SEQUENCE failed");
+  memset(buf, 0, sizeof(buf));
+
+  index     = 0;
+  tdo_count = 0;
+  req_count = 0;
+  req_size  = 2; // Command and Count
+  remaining = dbg_get_report_size() - req_size - 1;
+
+  while (index < dap_jtag_request_count)
+  {
+    int count = 0;
+    int size;
+
+    for (int i = index; i < dap_jtag_request_count; i++, count++)
+    {
+      if (dap_jtag_request[i].opt != dap_jtag_request[index].opt)
+        break;
+    }
+
+    if (count > 64)
+      count = 64;
+
+    if (count > (remaining * 8))
+      count = remaining * 8;
+
+    buf[req_size] = JTAG_SEQUENCE_COUNT(count) | dap_jtag_request[index].opt;
+
+    for (int i = 0; i < count; i++)
+      buf[req_size + 1 + i / 8] |= (dap_jtag_request[index + i].tdi << (i % 8));
+
+    if (dap_jtag_request[index].opt & JTAG_SEQUENCE_TDO)
+      tdo_size[tdo_count++] = count;
+
+    size = 1 + (count + 7) / 8;
+    req_size += size;
+    remaining -= size;
+
+    req_count++;
+    index += count;
+
+    if (remaining < 2 || index == dap_jtag_request_count)
+    {
+      int tdo_index = 1;
+
+      buf[0] = ID_DAP_JTAG_SEQUENCE;
+      buf[1] = req_count;
+
+      dbg_dap_cmd(buf, sizeof(buf), req_size);
+      check(DAP_OK == buf[0], "JTAG_SEQUENCE failed");
+
+      for (int i = 0; i < tdo_count; i++)
+      {
+        for (int j = 0; j < tdo_size[i]; j++)
+        {
+          int bit = (buf[tdo_index + j / 8] & (1 << (j % 8))) ? 1 : 0;
+          dap_jtag_response_buf[dap_jtag_response_count / 8] |= (bit << (dap_jtag_response_count % 8));
+          dap_jtag_response_count++;
+        }
+
+        tdo_index += (tdo_size[i] + 7) / 8;
+      }
+
+      memset(buf, 0, sizeof(buf));
+
+      tdo_count = 0;
+      req_count = 0;
+      req_size  = 2; // Command and Count
+      remaining = dbg_get_report_size() - req_size - 1;
+    }
+  }
+
+  dap_jtag_request_count = 0;
+}
+
+//-----------------------------------------------------------------------------
+void dap_jtag_read(int offset, uint8_t *data, int size)
+{
+  dap_jtag_flush();
 
   for (int i = 0; i < size; i++)
   {
-    buf[0] = ID_DAP_JTAG_SEQUENCE;
-    buf[1] = 1;
-    buf[2] = JTAG_SEQUENCE_COUNT(32) | JTAG_SEQUENCE_TDO;
-    buf[3] = 0;
-    buf[4] = 0;
-    buf[5] = 0;
-    buf[6] = 0;
+    int index = offset + i;
+    int bit;
 
-    dbg_dap_cmd(buf, sizeof(buf), 7);
-    check(DAP_OK == buf[0], "JTAG_SEQUENCE failed");
+    assert(index < dap_jtag_response_count);
 
-    uint32_t id = *((uint32_t *)&buf[1]);
+    bit = (dap_jtag_response_buf[index / 8] & (1 << (index % 8))) ? 1 : 0;
 
-    if (id)
-      idcode[count++] = id;
+    if ((i % 8) == 0)
+      data[i / 8] = 0;
+
+    data[i / 8] |= (bit << (i % 8));
+  }
+}
+
+//-----------------------------------------------------------------------------
+void dap_jtag_idle(int count)
+{
+  for (int i = 0; i < count; i++)
+    dap_jtag_clk(0, 0);
+}
+
+//-----------------------------------------------------------------------------
+void dap_jtag_reset(void)
+{
+  for (int i = 0; i < 16; i++)
+    dap_jtag_clk(0, 1);
+
+  dap_jtag_clk(0, 0);
+}
+
+//-----------------------------------------------------------------------------
+void dap_jtag_write_ir(int ir, int size)
+{
+  dap_jtag_clk(0, 1);
+  dap_jtag_clk(0, 1);
+  dap_jtag_clk(0, 0);
+  dap_jtag_clk(0, 0);
+
+  for (int i = 0; i < size; i++)
+    dap_jtag_clk((ir >> i) & 1, i == (size-1));
+
+  dap_jtag_clk(0, 1);
+  dap_jtag_clk(0, 0);
+}
+
+//-----------------------------------------------------------------------------
+void dap_jtag_write_dr(uint8_t *data, int size)
+{
+  dap_jtag_clk(0, 1);
+  dap_jtag_clk(0, 0);
+  dap_jtag_clk(0, 0);
+
+  for (int i = 0; i < size; i++)
+    dap_jtag_clk((data[i / 8] >> (i % 8)) & 1, i == (size-1));
+
+  dap_jtag_clk(0, 1);
+  dap_jtag_clk(0, 0);
+}
+
+//-----------------------------------------------------------------------------
+void dap_jtag_read_dr(uint8_t *data, int size)
+{
+  dap_jtag_clk(0, 1);
+  dap_jtag_clk(0, 0);
+  dap_jtag_clk(0, 0);
+
+  for (int i = 0; i < size; i++)
+    dap_jtag_clk_read(0, i == (size-1));
+
+  dap_jtag_clk(0, 1);
+  dap_jtag_clk(0, 0);
+
+  dap_jtag_read(0, data, size);
+}
+
+//-----------------------------------------------------------------------------
+int dap_jtag_scan_chain(uint32_t *idcode, int size)
+{
+  int count = 0;
+
+  dap_jtag_reset();
+
+  dap_jtag_clk(1, 1);
+  dap_jtag_clk(1, 0);
+  dap_jtag_clk(1, 0);
+
+  for (int i = 0; i < size; i++)
+  {
+    for (int j = 0; j < 32; j++)
+      dap_jtag_clk_read(0, 0);
+
+    dap_jtag_read(0, (uint8_t *)&idcode[count], 32);
+
+    if (idcode[count])
+      count++;
     else
       break;
   }
 
-  buf[0] = ID_DAP_JTAG_SEQUENCE;
-  buf[1] = 2;
-
-  // -> Update-DR
-  buf[2] = JTAG_SEQUENCE_COUNT(2) | JTAG_SEQUENCE_TMS;
-  buf[3] = 0x03;
-
-  // -> Run-Test/Idle
-  buf[4] = JTAG_SEQUENCE_COUNT(1);
-  buf[5] = 0x01;
-
-  dbg_dap_cmd(buf, sizeof(buf), 6);
-  check(DAP_OK == buf[0], "JTAG_SEQUENCE failed");
-
-  if (NULL == ir_len)
-    return count;
-
-  buf[0] = ID_DAP_JTAG_SEQUENCE;
-  buf[1] = 6;
-
-  // -> Select-IR-Scan
-  buf[2] = JTAG_SEQUENCE_COUNT(2) | JTAG_SEQUENCE_TMS;
-  buf[3] = 0x03;
-
-  // -> Shift-IR
-  buf[4] = JTAG_SEQUENCE_COUNT(2);
-  buf[5] = 0x03;
-
-  // -> Shift-IR
-  buf[6] = JTAG_SEQUENCE_COUNT(64);
-  buf[7] = 0x00;
-  buf[8] = 0x00;
-  buf[9] = 0x00;
-  buf[10] = 0x00;
-  buf[11] = 0x00;
-  buf[12] = 0x00;
-  buf[13] = 0x00;
-  buf[14] = 0x00;
-
-  // -> Shift-IR
-  buf[15] = JTAG_SEQUENCE_COUNT(64) | JTAG_SEQUENCE_TDO;
-  buf[16] = 0xff;
-  buf[17] = 0xff;
-  buf[18] = 0xff;
-  buf[19] = 0xff;
-  buf[20] = 0xff;
-  buf[21] = 0xff;
-  buf[22] = 0xff;
-  buf[23] = 0xff;
-
-  // -> Update-IR
-  buf[24] = JTAG_SEQUENCE_COUNT(2) | JTAG_SEQUENCE_TMS;
-  buf[25] = 0x03;
-
-  // -> Run-Test/Idle
-  buf[26] = JTAG_SEQUENCE_COUNT(1);
-  buf[27] = 0x01;
-
-  dbg_dap_cmd(buf, sizeof(buf), 28);
-  check(DAP_OK == buf[0], "JTAG_SEQUENCE failed");
-
-  uint64_t ir = *((uint64_t *)&buf[1]);
-
-  for (length = 0; length < 64 && (ir & (1 << length)) == 0; length++);
-
-  *ir_len = length;
+  dap_jtag_clk(1, 1);
+  dap_jtag_clk(1, 1);
+  dap_jtag_clk(1, 0);
 
   return count;
 }

@@ -57,6 +57,7 @@ extern target_ops_t target_mchp_cm23_ops;
 extern target_ops_t target_st_stm32g0_ops;
 extern target_ops_t target_gd_gd32f4xx_ops;
 extern target_ops_t target_nu_m480_ops;
+extern target_ops_t target_lattice_lcmxo2_ops;
 
 static target_t targets[] =
 {
@@ -69,6 +70,7 @@ static target_t targets[] =
   { NULL,		"STMicroelectronics STM32G0 series",	&target_st_stm32g0_ops },
   { NULL,		"GigaDevice GD32F4xx series",		&target_gd_gd32f4xx_ops },
   { NULL,		"Nuvoton M480 series",			&target_nu_m480_ops },
+  { NULL,		"Lattice LCMXO2 series",		&target_lattice_lcmxo2_ops },
 };
 
 /*- Implementations ---------------------------------------------------------*/

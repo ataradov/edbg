@@ -14,6 +14,7 @@ SRCS = \
   target_st_stm32g0.c \
   target_gd_gd32f4xx.c \
   target_nu_m480.c \
+  target_lattice_lcmxo2.c \
 
 HDRS = \
   dap.h \
@@ -44,6 +45,7 @@ endif
 
 CFLAGS += -W -Wall -Wextra -O3 -std=gnu11
 #CFLAGS += -fno-diagnostics-show-caret
+CFLAGS += -D_GNU_SOURCE
 
 all: $(BIN)
 

@@ -39,7 +39,7 @@
 
 /*- Variables ---------------------------------------------------------------*/
 static hid_device *handle = NULL;
-static uint8_t hid_buffer[1024 + 1];
+static uint8_t hid_buffer[DBG_MAX_EP_SIZE + 1];
 static int report_size = 512; // TODO: read actual report size
 
 /*- Implementations ---------------------------------------------------------*/
@@ -60,7 +60,7 @@ char *wcstombsdup(const wchar_t * const src)
 }
 
 //-----------------------------------------------------------------------------
-int dbg_enumerate(debugger_t *debuggers, int size) 
+int dbg_enumerate(debugger_t *debuggers, int size)
 {
   struct hid_device_info *devs, *cur_dev;
   int rsize = 0;
@@ -69,7 +69,7 @@ int dbg_enumerate(debugger_t *debuggers, int size)
     return 0;
 
   devs = hid_enumerate(0, 0);
-  cur_dev = devs;	
+  cur_dev = devs;
 
   for (cur_dev = devs; cur_dev && rsize < size; cur_dev = cur_dev->next)
   {
