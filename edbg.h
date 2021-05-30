@@ -51,6 +51,7 @@ void *buf_alloc(int size);
 void buf_free(void *buf);
 int load_file(char *name, uint8_t *data, int size);
 void save_file(char *name, uint8_t *data, int size);
+uint8_t *mem_find(uint8_t *haystack, int haystack_size, uint8_t *needle, int needle_size);
 
 #endif // _EDBG_H_
 

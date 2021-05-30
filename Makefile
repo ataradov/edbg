@@ -45,7 +45,6 @@ endif
 
 CFLAGS += -W -Wall -Wextra -O3 -std=gnu11
 #CFLAGS += -fno-diagnostics-show-caret
-CFLAGS += -D_GNU_SOURCE
 
 all: $(BIN)
 

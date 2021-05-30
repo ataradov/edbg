@@ -300,6 +300,21 @@ void save_file(char *name, uint8_t *data, int size)
 }
 
 //-----------------------------------------------------------------------------
+uint8_t *mem_find(uint8_t *haystack, int haystack_size, uint8_t *needle, int needle_size)
+{
+  if (haystack_size == 0 || needle_size == 0 || haystack_size < needle_size)
+    return NULL;
+
+  for (int i = 0; i < (haystack_size - needle_size); i++)
+  {
+    if (memcmp(haystack + i, needle, needle_size) == 0)
+      return haystack + i;
+  }
+
+  return NULL;
+}
+
+//-----------------------------------------------------------------------------
 static void print_debugger_info(debugger_t *debugger)
 {
   uint8_t buf[256];

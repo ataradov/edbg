@@ -125,7 +125,7 @@ static bool bitstream_valid(uint8_t *data, int size)
   if (size < 1024)
     return false;
 
-  if (NULL == memmem(data, 1024, target_device.name, strlen(target_device.name)))
+  if (NULL == mem_find(data, 1024, (uint8_t *)target_device.name, strlen(target_device.name)))
     return false;
 
   return true;
@@ -147,7 +147,7 @@ static void parse_jed_file(jed_file_t *file, uint8_t *data, int size)
   if (!bitstream_valid(data, size))
     error_exit("malformed JED file: device signature not found");
 
-  ptr = memmem(data, size, start_text, strlen(start_text));
+  ptr = mem_find(data, size, (uint8_t *)start_text, strlen(start_text));
 
   if (NULL == ptr)
     error_exit("malformed JED file: no 'L000000' found");
@@ -175,7 +175,7 @@ static void parse_jed_file(jed_file_t *file, uint8_t *data, int size)
   if (bit_count % FLASH_ROW_SIZE)
     error_exit("malformed JED file: size of the configuration data must be a multiple of 128");
 
-  ptr = memmem(data, size, fr_text, strlen(fr_text));
+  ptr = mem_find(data, size, (uint8_t *)fr_text, strlen(fr_text));
 
   if (NULL == ptr)
     error_exit("malformed JED file: no feature row found");
