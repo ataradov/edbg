@@ -142,6 +142,18 @@ void warning(char *fmt, ...)
 }
 
 //-----------------------------------------------------------------------------
+static void disconnect_debugger(void)
+{
+  if (!g_debugger)
+    return;
+
+  dap_reset_target_hw(1);
+  dap_led(0, 0);
+  dap_disconnect();
+  dbg_close();
+}
+
+//-----------------------------------------------------------------------------
 void check(bool cond, char *fmt, ...)
 {
   static bool check_failed = false;
@@ -155,12 +167,7 @@ void check(bool cond, char *fmt, ...)
 
     check_failed = true;
 
-    if (g_debugger)
-    {
-      dap_led(0, 0);
-      dap_disconnect();
-      dbg_close();
-    }
+    disconnect_debugger();
 
     va_start(args, fmt);
     fprintf(stderr, "Error: ");
@@ -177,12 +184,7 @@ void error_exit(char *fmt, ...)
 {
   va_list args;
 
-  if (g_debugger)
-  {
-    dap_led(0, 0);
-    dap_disconnect();
-    dbg_close();
-  }
+  disconnect_debugger();
 
   va_start(args, fmt);
   fprintf(stderr, "Error: ");
@@ -196,13 +198,7 @@ void error_exit(char *fmt, ...)
 //-----------------------------------------------------------------------------
 void perror_exit(char *text)
 {
-  if (g_debugger)
-  {
-    dap_led(0, 0);
-    dap_disconnect();
-    dbg_close();
-  }
-
+  disconnect_debugger();
   perror(text);
   exit(1);
 }
