@@ -620,12 +620,7 @@ int main(int argc, char **argv)
 
   target_ops->deselect();
 
-  dap_reset_target_hw(1);
-
-  dap_disconnect();
-  dap_led(0, 0);
-
-  dbg_close();
+  disconnect_debugger();
 
   return 0;
 }
