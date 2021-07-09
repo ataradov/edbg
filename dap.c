@@ -478,6 +478,8 @@ void dap_reset_target_hw(int state)
   buf[5] = 0;
   buf[6] = 0;
   dbg_dap_cmd(buf, sizeof(buf), 7);
+
+  sleep_ms(10);
 }
 
 //-----------------------------------------------------------------------------

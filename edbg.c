@@ -412,7 +412,7 @@ static void print_help(char *name)
       "  -f, --file <file>          binary file to be programmed or verified; also read output file name\n"
       "  -t, --target <name>        specify a target type (use '-t list' for a list of supported target types)\n"
       "  -l, --list                 list all available debuggers\n"
-      "  -s, --serial <number>      use a debugger with a specified serial number\n"
+      "  -s, --serial <number>      use a debugger with a specified serial number or index in the list\n"
       "  -c, --clock <freq>         interface clock frequency in kHz (default 16000)\n"
       "  -o, --offset <offset>      offset for the operation\n"
       "  -z, --size <size>          size for the operation\n"
@@ -521,7 +521,7 @@ int main(int argc, char **argv)
   {
     message("Attached debuggers:\n");
     for (int i = 0; i < n_debuggers; i++)
-      message("  %s - %s %s\n", debuggers[i].serial, debuggers[i].manufacturer, debuggers[i].product);
+      message("  %d: %s - %s %s\n", i, debuggers[i].serial, debuggers[i].manufacturer, debuggers[i].product);
     return 0;
   }
 
@@ -538,12 +538,22 @@ int main(int argc, char **argv)
 
   if (g_serial)
   {
-    for (int i = 0; i < n_debuggers; i++)
+    char *end = NULL;
+    int index = strtoul(g_serial, &end, 10);
+
+    if (index < n_debuggers && end[0] == 0)
     {
-      if (0 == strcmp(debuggers[i].serial, g_serial))
+      debugger = index;
+    }
+    else
+    {
+      for (int i = 0; i < n_debuggers; i++)
       {
-        debugger = i;
-        break;
+        if (0 == strcmp(debuggers[i].serial, g_serial))
+        {
+          debugger = i;
+          break;
+        }
       }
     }
 
