@@ -147,6 +147,8 @@ static void disconnect_debugger(void)
   if (!g_debugger)
     return;
 
+  g_debugger = NULL;
+
   dap_reset_target_hw(1);
   dap_led(0, 0);
   dap_disconnect();
