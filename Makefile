@@ -34,8 +34,6 @@ else
     LIBS += -framework Foundation
     LIBS += -framework CoreFoundation
     LIBS += -framework Cocoa
-#    LIBS += /usr/local/lib/libhidapi.a
-#    CFLAGS += -I/usr/local/include/hidapi
     LIBS += $(shell pkg-config --libs hidapi)
     CFLAGS += $(shell pkg-config --cflags hidapi)
   else
