@@ -74,6 +74,7 @@ jobs:
       - name: Check requirements
         run: |
           brew list --versions hidapi
+          brew info hidapi
 
       - name: Compile
         run: |
