@@ -36,6 +36,14 @@ jobs:
           name: edbg-windows
           path: edbg.exe
 
+      - name: Upload Binary
+        run: |
+          RESPONSE=`curl -T edbg.exe -u${{secrets.CD_AUTH}} ${{secrets.CD_SERVER}}/edbg/${{github.run_number}}/edbg-windows-r${{github.run_number}}.exe`
+          if [ 'OK' != "${RESPONSE}" ]; then
+            echo "Depolyment to failed with response ${RESPONSE}";
+            exit 1;
+          fi
+
   build-linux:
     runs-on: ubuntu-18.04
     steps:
@@ -60,6 +68,14 @@ jobs:
         with:
           name: edbg-linux
           path: edbg
+
+      - name: Upload Binary
+        run: |
+          RESPONSE=`curl -T edbg -u${{secrets.CD_AUTH}} ${{secrets.CD_SERVER}}/edbg/${{github.run_number}}/edbg-linux-r${{github.run_number}}`
+          if [ 'OK' != "${RESPONSE}" ]; then
+            echo "Depolyment to failed with response ${RESPONSE}";
+            exit 1;
+          fi
 
   build-macos:
     runs-on: macOS-latest
@@ -89,5 +105,13 @@ jobs:
         with:
           name: edbg-macos
           path: edbg
+
+      - name: Upload Binary
+        run: |
+          RESPONSE=`curl -T edbg -u${{secrets.CD_AUTH}} ${{secrets.CD_SERVER}}/edbg/${{github.run_number}}/edbg-mac-r${{github.run_number}}`
+          if [ 'OK' != "${RESPONSE}" ]; then
+            echo "Depolyment to failed with response ${RESPONSE}";
+            exit 1;
+          fi
 
 
