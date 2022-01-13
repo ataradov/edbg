@@ -140,13 +140,14 @@ static void target_select(target_options_t *options)
 {
   uint32_t chip_id, chip_exid;
 
-  dap_reset_target_hw(1);
   dap_reset_link();
 
   // Stop the core
   dap_write_word(DHCSR, DHCSR_DBGKEY | DHCSR_DEBUGEN | DHCSR_HALT);
   dap_write_word(DEMCR, DEMCR_VC_CORERESET);
-  dap_write_word(AIRCR, AIRCR_VECTKEY | AIRCR_SYSRESETREQ);
+
+  dap_reset_target_hw(1);
+  dap_reset_link();
 
   chip_id = dap_read_word(CHIPID_CIDR);
   chip_exid = dap_read_word(CHIPID_EXID);
@@ -195,8 +196,9 @@ static void target_select(target_options_t *options)
 //-----------------------------------------------------------------------------
 static void target_deselect(void)
 {
+  dap_write_word(DHCSR, DHCSR_DBGKEY);
   dap_write_word(DEMCR, 0);
-  dap_write_word(AIRCR, AIRCR_VECTKEY | AIRCR_SYSRESETREQ);
+  dap_reset_target_hw(1);
 
   target_free_options(&target_options);
 }
