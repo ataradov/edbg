@@ -37,6 +37,7 @@
 /*- Types -------------------------------------------------------------------*/
 typedef struct
 {
+  int          reset;
   bool         erase;
   bool         program;
   bool         verify;

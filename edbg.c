@@ -59,6 +59,7 @@ static const struct option long_options[] =
 {
   { "help",      no_argument,        0, 'h' },
   { "verbose",   no_argument,        0, 'b' },
+  { "reset",     required_argument,  0, 'x' },
   { "erase",     no_argument,        0, 'e' },
   { "program",   no_argument,        0, 'p' },
   { "verify",    no_argument,        0, 'v' },
@@ -76,7 +77,7 @@ static const struct option long_options[] =
   { 0, 0, 0, 0 }
 };
 
-static const char *short_options = "hbepvkurf:t:ls:c:o:z:F:";
+static const char *short_options = "hbx:epvkurf:t:ls:c:o:z:F:";
 
 /*- Variables ---------------------------------------------------------------*/
 static char *g_serial = NULL;
@@ -88,6 +89,7 @@ static debugger_t *g_debugger = NULL;
 
 static target_options_t g_target_options =
 {
+  .reset        = 0,
   .erase        = false,
   .program      = false,
   .verify       = false,
@@ -149,7 +151,6 @@ static void disconnect_debugger(void)
 
   g_debugger = NULL;
 
-  dap_reset_target_hw(1);
   dap_led(0, 0);
   dap_disconnect();
   dbg_close();
@@ -405,6 +406,7 @@ static void print_help(char *name)
       "Options:\n"
       "  -h, --help                 print this help message and exit\n"
       "  -b, --verbose              print verbose messages\n"
+      "  -x, --reset <duration>     assert the reset pin before any other operation (duration in ms)\n"
       "  -e, --erase                perform a chip erase before programming\n"
       "  -p, --program              program the chip\n"
       "  -v, --verify               verify memory\n"
@@ -470,6 +472,7 @@ static void parse_command_line(int argc, char **argv)
     switch (c)
     {
       case 'h': help = true; break;
+      case 'x': g_target_options.reset = strtoul(optarg, NULL, 0); break;
       case 'e': g_target_options.erase = true; break;
       case 'p': g_target_options.program = true; break;
       case 'v': g_target_options.verify = true; break;
@@ -505,12 +508,15 @@ int main(int argc, char **argv)
   int n_debuggers = 0;
   int debugger = -1;
   target_ops_t *target_ops;
+  bool active_actions;
 
   parse_command_line(argc, argv);
 
-  if (!(g_target_options.erase || g_target_options.program || g_target_options.verify ||
-      g_target_options.lock || g_target_options.read || g_target_options.fuse_cmd ||
-      g_list || g_target))
+  active_actions = g_target_options.unlock || g_target_options.erase ||
+      g_target_options.program || g_target_options.verify || g_target_options.lock ||
+      g_target_options.read || g_target_options.fuse_cmd;
+
+  if (!(active_actions || g_list || g_target || (g_target_options.reset == 0)))
     error_exit("no actions specified");
 
   if (g_target_options.read && (g_target_options.erase || g_target_options.program ||
@@ -579,6 +585,20 @@ int main(int argc, char **argv)
 
   reconnect_debugger();
 
+  if (g_target_options.reset > 0)
+  {
+    dap_reset_pin(0);
+    sleep_ms(g_target_options.reset);
+    dap_reset_pin(1);
+    sleep_ms(10);
+  }
+
+  if (!active_actions)
+  {
+    disconnect_debugger();
+    return 0;
+  }
+
   target_ops->select(&g_target_options);
 
   if (g_target_options.unlock)
@@ -631,6 +651,8 @@ int main(int argc, char **argv)
   }
 
   target_ops->deselect();
+
+  dap_reset_target_hw(1);
 
   disconnect_debugger();
 
