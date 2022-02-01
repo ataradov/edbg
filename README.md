@@ -30,6 +30,7 @@ Usage: edbg [options]
 Options:
   -h, --help                 print this help message and exit
   -b, --verbose              print verbose messages
+  -x, --reset <duration>     assert the reset pin before any other operation (duration in ms)
   -e, --erase                perform a chip erase before programming
   -p, --program              program the chip
   -v, --verify               verify memory

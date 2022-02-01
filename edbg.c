@@ -587,10 +587,12 @@ int main(int argc, char **argv)
 
   if (g_target_options.reset > 0)
   {
+    verbose("Resetting...");
     dap_reset_pin(0);
     sleep_ms(g_target_options.reset);
     dap_reset_pin(1);
     sleep_ms(10);
+    verbose(" done.\n");
   }
 
   if (!active_actions)
