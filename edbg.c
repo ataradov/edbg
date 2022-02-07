@@ -85,7 +85,7 @@ static bool g_list = false;
 static char *g_target = NULL;
 static bool g_verbose = false;
 static long g_clock = 16000000;
-static debugger_t *g_debugger = NULL;
+static bool g_debugger_open = false;
 
 static target_options_t g_target_options =
 {
@@ -146,10 +146,10 @@ void warning(char *fmt, ...)
 //-----------------------------------------------------------------------------
 static void disconnect_debugger(void)
 {
-  if (!g_debugger)
+  if (!g_debugger_open)
     return;
 
-  g_debugger = NULL;
+  g_debugger_open = false;
 
   dap_led(0, 0);
   dap_disconnect();
@@ -576,11 +576,11 @@ int main(int argc, char **argv)
   else if (n_debuggers > 1 && -1 == debugger)
     error_exit("more than one debugger found, please specify a serial number");
 
-  g_debugger = &debuggers[debugger];
+  dbg_open(&debuggers[debugger]);
 
-  dbg_open(g_debugger);
+  g_debugger_open = true;
 
-  print_debugger_info(g_debugger);
+  print_debugger_info(&debuggers[debugger]);
   print_clock_freq(g_clock);
 
   reconnect_debugger();
