@@ -332,7 +332,7 @@ static void print_debugger_info(debugger_t *debugger)
   strcat(str, size ? (char *)buf : debugger->serial);
   strcat(str, " ");
 
-  size = dap_info(DAP_INFO_FW_VER, buf, sizeof(buf));
+  size = dap_info(DAP_INFO_CMSIS_DAP_VER, buf, sizeof(buf));
   strcat(str, (char *)buf);
   strcat(str, " ");
 
