@@ -15,6 +15,7 @@ SRCS = \
   target_gd_gd32f4xx.c \
   target_nu_m480.c \
   target_lattice_lcmxo2.c \
+  target_rpi_rp2040.c \
 
 HDRS = \
   dap.h \

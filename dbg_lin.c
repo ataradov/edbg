@@ -208,7 +208,8 @@ int dbg_dap_cmd(uint8_t *data, int resp_size, int req_size)
 
   check(res, "empty response received");
 
-  check(hid_buffer[0] == cmd, "invalid response received");
+  if (hid_buffer[0] != cmd)
+    error_exit("invalid response received: request = 0x%02x, response = 0x%02x", cmd, hid_buffer[0]);
 
   res--;
   memcpy(data, &hid_buffer[1], (resp_size < res) ? resp_size : res);

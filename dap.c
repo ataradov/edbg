@@ -99,14 +99,17 @@ enum
 
 enum
 {
-  SWD_DP_R_IDCODE    = 0x00,
+  SWD_DP_R_IDCODE    = 0x00, // DPIDR in ADIv5.2
   SWD_DP_W_ABORT     = 0x00,
-  SWD_DP_R_CTRL_STAT = 0x04,
-  SWD_DP_W_CTRL_STAT = 0x04, // When CTRLSEL == 0
-  SWD_DP_W_WCR       = 0x04, // When CTRLSEL == 1
+  SWD_DP_CTRL_STAT   = 0x04, // DPBANKSEL == 0
+  SWD_DP_DLCR        = 0x04, // DPBANKSEL == 1, WCR in ADIv5.1
+  SWD_DP_TARGETID    = 0x04, // DPBANKSEL == 2
+  SWD_DP_DLPIDR      = 0x04, // DPBANKSEL == 3
+  SWD_DP_EVENTSTAT   = 0x04, // DPBANKSEL == 4
   SWD_DP_R_RESEND    = 0x08,
   SWD_DP_W_SELECT    = 0x08,
   SWD_DP_R_RDBUFF    = 0x0c,
+  SWD_DP_W_TARGETSEL = 0x0c,
 };
 
 enum
@@ -156,7 +159,7 @@ enum
 #define DP_CST_CSYSPWRUPREQ    (1 << 30)
 #define DP_CST_CSYSPWRUPACK    (1 << 31)
 
-#define DP_SELECT_CTRLSEL      (1 << 0)
+#define DP_SELECT_DPBANKSEL(x) ((x) << 0)
 #define DP_SELECT_APBANKSEL(x) ((x) << 4)
 #define DP_SELECT_APSEL(x)     ((x) << 24)
 
@@ -224,6 +227,8 @@ typedef struct
 static void dap_add_req(int type, int size, uint32_t addr, uint32_t data);
 
 /*- Variables ---------------------------------------------------------------*/
+static int dap_dp_version = 1;
+static uint32_t dap_target_id = DAP_INVALID_TARGET_ID;
 static int dap_interface = DAP_INTERFACE_NONE;
 
 static dap_request_t dap_request[TRANSFER_SIZE];
@@ -253,6 +258,18 @@ static uint8_t dap_jtag_response_buf[JTAG_RESPONSE_BUF_SIZE];
 static int dap_jtag_response_count = 0;
 
 /*- Implementations ---------------------------------------------------------*/
+
+//-----------------------------------------------------------------------------
+void dap_set_dp_version(int version)
+{
+  dap_dp_version = version;
+}
+
+//-----------------------------------------------------------------------------
+void dap_set_target_id(uint32_t id)
+{
+  dap_target_id = id;
+}
 
 //-----------------------------------------------------------------------------
 void dap_led(int index, int state)
@@ -376,36 +393,121 @@ int dap_info(int info, uint8_t *data, int size)
 }
 
 //-----------------------------------------------------------------------------
+static uint32_t dap_parity(uint32_t value)
+{
+  value ^= value >> 16;
+  value ^= value >> 8;
+  value ^= value >> 4;
+  value &= 0x0f;
+
+  return (0x6996 >> value) & 1;
+}
+
+//-----------------------------------------------------------------------------
 void dap_reset_link(void)
 {
   uint8_t buf[32];
 
   if (DAP_INTERFACE_SWD == dap_interface)
   {
-    buf[0] = ID_DAP_SWJ_SEQUENCE;
-    buf[1] = (7 + 2 + 7 + 1) * 8;
-    buf[2] = 0xff;
-    buf[3] = 0xff;
-    buf[4] = 0xff;
-    buf[5] = 0xff;
-    buf[6] = 0xff;
-    buf[7] = 0xff;
-    buf[8] = 0xff;
-    buf[9] = 0x9e;
-    buf[10] = 0xe7;
-    buf[11] = 0xff;
-    buf[12] = 0xff;
-    buf[13] = 0xff;
-    buf[14] = 0xff;
-    buf[15] = 0xff;
-    buf[16] = 0xff;
-    buf[17] = 0xff;
-    buf[18] = 0x00;
+    if (dap_dp_version == 1)
+    {
+      buf[0] = ID_DAP_SWJ_SEQUENCE;
+      buf[1] = (7 + 2 + 7 + 1) * 8;
+      buf[2] = 0xff;
+      buf[3] = 0xff;
+      buf[4] = 0xff;
+      buf[5] = 0xff;
+      buf[6] = 0xff;
+      buf[7] = 0xff;
+      buf[8] = 0xff;
+      buf[9] = 0x9e;
+      buf[10] = 0xe7;
+      buf[11] = 0xff;
+      buf[12] = 0xff;
+      buf[13] = 0xff;
+      buf[14] = 0xff;
+      buf[15] = 0xff;
+      buf[16] = 0xff;
+      buf[17] = 0xff;
+      buf[18] = 0x00;
 
-    dbg_dap_cmd(buf, sizeof(buf), 19);
-    check(DAP_OK == buf[0], "SWJ_SEQUENCE failed");
+      dbg_dap_cmd(buf, sizeof(buf), 19);
+      check(DAP_OK == buf[0], "SWJ_SEQUENCE failed");
 
-    dap_read_idcode();
+      dap_read_idcode();
+    }
+    else if (dap_dp_version == 2)
+    {
+      // Switch to SWD
+      buf[0] = ID_DAP_SWJ_SEQUENCE;
+      buf[1] = (1 + 16 + 7 + 1) * 8;
+      buf[2] = 0xff;
+      buf[3] = 0x92; // Selection Alert Sequence
+      buf[4] = 0xf3;
+      buf[5] = 0x09;
+      buf[6] = 0x62;
+      buf[7] = 0x95;
+      buf[8] = 0x2d;
+      buf[9] = 0x85;
+      buf[10] = 0x86;
+      buf[11] = 0xe9;
+      buf[12] = 0xaf;
+      buf[13] = 0xdd;
+      buf[14] = 0xe3;
+      buf[15] = 0xa2;
+      buf[16] = 0x0e;
+      buf[17] = 0xbc;
+      buf[18] = 0x19;
+      buf[19] = 0xa0; // 4 cycles with SWDIO/TMS low and Activation Code
+      buf[20] = 0xf1; // Activation Code and SWD Line Reset
+      buf[21] = 0xff;
+      buf[22] = 0xff;
+      buf[23] = 0xff;
+      buf[24] = 0xff;
+      buf[25] = 0xff;
+      buf[26] = 0x3f;
+
+      dbg_dap_cmd(buf, sizeof(buf), 27);
+      check(DAP_OK == buf[0], "SWJ_SEQUENCE failed");
+
+      // Target Select
+      buf[0] = ID_DAP_SWD_SEQUENCE;
+      buf[1] = 5; // Request Count
+      // 1
+      buf[2] = SWD_SEQUENCE_COUNT(7 * 8);
+      buf[3] = 0xff;
+      buf[4] = 0xff;
+      buf[5] = 0xff;
+      buf[6] = 0xff;
+      buf[7] = 0xff;
+      buf[8] = 0xff;
+      buf[9] = 0x3f;
+      // 2
+      buf[10] = SWD_SEQUENCE_COUNT(8);
+      buf[11] = 0x99; // DP, Write, TARGETSEL
+      // 3
+      buf[12] = SWD_SEQUENCE_COUNT(5) | SWD_SEQUENCE_DIN;
+      // 4
+      buf[13] = SWD_SEQUENCE_COUNT(32+1);
+      buf[14] = dap_target_id >> 0;
+      buf[15] = dap_target_id >> 8;
+      buf[16] = dap_target_id >> 16;
+      buf[17] = dap_target_id >> 24;
+      buf[18] = dap_parity(dap_target_id);
+      // 5
+      buf[19] = SWD_SEQUENCE_COUNT(2);
+      buf[20] = 0x00;
+
+      dbg_dap_cmd(buf, sizeof(buf), 21);
+      check(DAP_OK == buf[0], "SWD_SEQUENCE failed");
+
+      dap_read_idcode();
+    }
+    else
+    {
+      error_exit("internal: unknown dap_dp_version value (%d)", dap_dp_version);
+    }
   }
   else if (DAP_INTERFACE_JTAG == dap_interface)
   {
@@ -435,8 +537,15 @@ void dap_reset_link(void)
       DP_ABORT_STKCMPCLR | DP_ABORT_STKERRCLR | DP_ABORT_ORUNERRCLR | DP_ABORT_WDERRCLR);
   dap_add_req(TRANSFER_TYPE_WRITE_REG, TRANSFER_SIZE_WORD, SWD_DP_W_SELECT,
       DP_SELECT_APBANKSEL(0) | DP_SELECT_APSEL(0));
-  dap_add_req(TRANSFER_TYPE_WRITE_REG, TRANSFER_SIZE_WORD, SWD_DP_W_CTRL_STAT,
+  dap_add_req(TRANSFER_TYPE_WRITE_REG, TRANSFER_SIZE_WORD, SWD_DP_CTRL_STAT,
       DP_CST_CDBGPWRUPREQ | DP_CST_CSYSPWRUPREQ | DP_CST_MASKLANE(0xf));
+  dap_transfer();
+}
+
+//-----------------------------------------------------------------------------
+void dap_clear_pwrup_req(void)
+{
+  dap_add_req(TRANSFER_TYPE_WRITE_REG, TRANSFER_SIZE_WORD, SWD_DP_CTRL_STAT, 0);
   dap_transfer();
 }
 
@@ -682,7 +791,7 @@ static bool buffer_request(dap_request_t *req)
     dap_response_size += sizeof(uint32_t);
   }
 
-  if (dap_buf_size > packet_size || dap_response_size > packet_size)
+  if (dap_buf_size > packet_size || dap_response_size > packet_size || dap_ops_size > 255)
   {
     dap_buf_size      = buf_size;
     dap_ops_size      = ops_size;
@@ -810,35 +919,87 @@ void dap_write_word(uint32_t addr, uint32_t data)
 //-----------------------------------------------------------------------------
 void dap_read_block(uint32_t addr, uint8_t *data, int size)
 {
-  uint32_t *buf = (uint32_t *)data;
-  int count = size / sizeof(uint32_t);
+  uint32_t ptr = addr;
+  uint32_t rem = size;
+  int cnt = 0;
 
-  assert((addr % sizeof(uint32_t)) == 0 && (size % sizeof(uint32_t)) == 0);
+  if (size == 0)
+    return;
 
-  for (int i = 0; i < count; i++)
+  while (rem && (ptr % sizeof(uint32_t)))
   {
-    dap_read_word_req(addr);
-    addr += sizeof(uint32_t);
+    dap_read_byte_req(ptr);
+    ptr += sizeof(uint8_t);
+    rem -= sizeof(uint8_t);
+  }
+
+  while (rem >= sizeof(uint32_t))
+  {
+    dap_read_word_req(ptr);
+    ptr += sizeof(uint32_t);
+    rem -= sizeof(uint32_t);
+  }
+
+  while (rem)
+  {
+    dap_read_byte_req(ptr);
+    ptr += sizeof(uint8_t);
+    rem -= sizeof(uint8_t);
   }
 
   dap_transfer();
 
-  for (int i = 0; i < count; i++)
-    buf[i] = dap_response[i];
+  while (size && (addr % sizeof(uint32_t)))
+  {
+    *data = dap_response[cnt++];
+    data += sizeof(uint8_t);
+    addr += sizeof(uint8_t);
+    size -= sizeof(uint8_t);
+  }
+
+  while (size >= (int)sizeof(uint32_t))
+  {
+    *(uint32_t *)data = dap_response[cnt++];
+    data += sizeof(uint32_t);
+    size -= sizeof(uint32_t);
+  }
+
+  while (size)
+  {
+    *data = dap_response[cnt++];
+    data += sizeof(uint8_t);
+    size -= sizeof(uint8_t);
+  }
 }
 
 //-----------------------------------------------------------------------------
 void dap_write_block(uint32_t addr, uint8_t *data, int size)
 {
-  uint32_t *buf = (uint32_t *)data;
-  int count = size / sizeof(uint32_t);
+  if (size == 0)
+    return;
 
-  assert((addr % sizeof(uint32_t)) == 0 && (size % sizeof(uint32_t)) == 0);
-
-  for (int i = 0; i < count; i++)
+  while (size && (addr % sizeof(uint32_t)))
   {
-    dap_write_word_req(addr, buf[i]);
+    dap_write_byte_req(addr, *data);
+    data += sizeof(uint8_t);
+    addr += sizeof(uint8_t);
+    size -= sizeof(uint8_t);
+  }
+
+  while (size >= (int)sizeof(uint32_t))
+  {
+    dap_write_word_req(addr, *(uint32_t *)data);
+    data += sizeof(uint32_t);
     addr += sizeof(uint32_t);
+    size -= sizeof(uint32_t);
+  }
+
+  while (size)
+  {
+    dap_write_byte_req(addr, *data);
+    data += sizeof(uint8_t);
+    addr += sizeof(uint8_t);
+    size -= sizeof(uint8_t);
   }
 
   dap_transfer();

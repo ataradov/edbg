@@ -192,7 +192,8 @@ int dbg_dap_cmd(uint8_t *data, int resp_size, int req_size)
   if (FALSE == ReadFile(debugger_handle, (LPVOID)hid_buffer, report_size + 1, &res, NULL))
     error_exit("debugger read()");
 
-  check(hid_buffer[1] == cmd, "invalid response received");
+  if (hid_buffer[1] != cmd)
+    error_exit("invalid response received: request = 0x%02x, response = 0x%02x", cmd, hid_buffer[1]);
 
   res -= 2;
   memcpy(data, &hid_buffer[2], (resp_size < (int)res) ? resp_size : (int)res);

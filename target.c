@@ -58,6 +58,7 @@ extern target_ops_t target_st_stm32g0_ops;
 extern target_ops_t target_gd_gd32f4xx_ops;
 extern target_ops_t target_nu_m480_ops;
 extern target_ops_t target_lattice_lcmxo2_ops;
+extern target_ops_t target_rpi_rp2040_ops;
 
 static target_t targets[] =
 {
@@ -71,6 +72,7 @@ static target_t targets[] =
   { NULL,		"GigaDevice GD32F4xx series",		&target_gd_gd32f4xx_ops },
   { NULL,		"Nuvoton M480 series",			&target_nu_m480_ops },
   { NULL,		"Lattice LCMXO2 series",		&target_lattice_lcmxo2_ops },
+  { NULL,		"Raspberry Pi RP2040 (external flash)", &target_rpi_rp2040_ops },
 };
 
 /*- Implementations ---------------------------------------------------------*/

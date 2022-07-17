@@ -72,7 +72,12 @@ enum
   DAP_INTERFACE_JTAG,
 };
 
+#define DAP_INVALID_TARGET_ID  0xffffffff
+
 /*- Prototypes --------------------------------------------------------------*/
+void dap_set_dp_version(int version);
+void dap_set_target_id(uint32_t id);
+
 void dap_led(int index, int state);
 void dap_connect(int interf);
 void dap_disconnect(void);
@@ -83,6 +88,7 @@ void dap_jtag_configure(int count, int *ir_len);
 void dap_jtag_set_index(int index);
 int dap_info(int info, uint8_t *data, int size);
 void dap_reset_link(void);
+void dap_clear_pwrup_req(void);
 
 void dap_reset_target(void);
 void dap_reset_target_hw(int state);
