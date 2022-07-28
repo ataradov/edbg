@@ -111,7 +111,7 @@ void sha256(uint8_t *data, int size, uint8_t *hash)
   uint64_t bit_size = size * 8;
   uint8_t buf[64];
 
-  while (size > 64)
+  while (size >= 64)
   {
     sha256_process(H, data);
     data += 64;
