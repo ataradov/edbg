@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "target.h"
+#include "utils.h"
 #include "edbg.h"
 #include "dap.h"
 
@@ -255,7 +256,7 @@ static void target_erase(void)
   if (dap_read_byte(DSU_STATUSB) & DSU_STATUSB_BCCD1)
   {
     uint32_t status = dap_read_word(DSU_BCC1);
-    error_exit("BootROM indicated an error (STATUS = 0x%08x)", status);
+    warning("BootROM indicated an error (STATUS = 0x%08x), still trying to erase", status);
   }
   else
   {
@@ -402,9 +403,9 @@ static int target_fuse_read(int section, uint8_t *data)
 {
   uint32_t addr = 0;
 
-  if (0 == section)
+  if (0 == section || 2 == section)
     addr = USER_ROW_ADDR;
-  else if (1 == section)
+  else if (1 == section || 3 == section)
     addr = BOCOR_ROW_ADDR;
   else
     return 0;
@@ -421,12 +422,40 @@ static void target_fuse_write(int section, uint8_t *data)
 {
   uint32_t addr = 0;
 
-  check(section < 2, "internal: incorrect section index in target_fuse_write()");
-
   if (0 == section)
+  {
+    uint32_t crc = crc32(&data[8], 20);
+
+    data[28] = crc;
+    data[29] = crc >> 8;
+    data[30] = crc >> 16;
+    data[31] = crc >> 24;
+
     addr = USER_ROW_ADDR;
-  else
+  }
+  else if (1 == section)
+  {
+    uint32_t crc = crc32(data, 8);
+
+    data[8]  = crc;
+    data[9]  = crc >> 8;
+    data[10] = crc >> 16;
+    data[11] = crc >> 24;
+
+    sha256(data, FLASH_ROW_SIZE-32, &data[FLASH_ROW_SIZE-32]);
+
     addr = BOCOR_ROW_ADDR;
+  }
+  else if (2 == section)
+  {
+    addr = USER_ROW_ADDR;
+  }
+  else if (3 == section)
+  {
+    addr = BOCOR_ROW_ADDR;
+  }
+  else
+    error_exit("internal: incorrect section index in target_fuse_write()");
 
   bootrom_park();
 
@@ -450,9 +479,11 @@ static char *target_enumerate(int i)
 //-----------------------------------------------------------------------------
 static char target_help[] =
   "Fuses:\n"
-  "  This device has two fuses sections:\n"
-  "   - Section 0 represents a complete User Row (256 bytes)\n"
-  "   - Section 1 represents a complete BOCOR Row (256 bytes)\n";
+  "  This device has two fuse sections (256 bytes each) represented by the following indexes:\n"
+  "    0 - User Row, update CRC\n"
+  "    1 - Boot Configuration Row, update CRC and hash\n"
+  "    2 - User Row, update only specified data\n"
+  "    3 - Boot Configuration, update only specified data\n";
 
 //-----------------------------------------------------------------------------
 target_ops_t target_mchp_cm23_ops =

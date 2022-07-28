@@ -4,6 +4,7 @@ UNAME ?= $(shell uname)
 SRCS = \
   dap.c \
   edbg.c \
+  utils.c \
   target.c \
   target_atmel_cm0p.c \
   target_atmel_cm3.c \
@@ -21,6 +22,7 @@ HDRS = \
   dap.h \
   dbg.h \
   edbg.h \
+  utils.h \
   target.h
 
 ifeq ($(UNAME), Linux)
