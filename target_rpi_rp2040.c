@@ -503,7 +503,7 @@ static void target_select(target_options_t *options)
   else
     error_exit("unknown flash device");
 
-  check(flash_size <= 2*1024*1024, "flash size larger than 2 MB is not supported");
+  check(flash_size <= 16*1024*1024, "flash size larger than 16 MB is not supported");
 
   target_options = *options;
   target_check_options(&target_options, flash_size, FLASH_SECTOR_SIZE);
