@@ -37,17 +37,17 @@ extern target_ops_t target_rpi_rp2040_ops;
 
 static target_t targets[] =
 {
-  { "atmel_cm0p",	"Atmel SAM C/D/L/R series",		&target_atmel_cm0p_ops },
-  { "atmel_cm3",	"Atmel SAM3X/A/U series",		&target_atmel_cm3_ops },
-  { "atmel_cm4",	"Atmel SAM G and SAM4 series",		&target_atmel_cm4_ops },
-  { "atmel_cm7",	"Atmel SAM E7x/S7x/V7x series",		&target_atmel_cm7_ops },
-  { "atmel_cm4v2",	"Atmel SAM D5x/E5x",			&target_atmel_cm4v2_ops },
-  { "mchp_cm23",	"Microchip SAM L10/L11",		&target_mchp_cm23_ops },
-  { NULL,		"STMicroelectronics STM32G0 series",	&target_st_stm32g0_ops },
-  { NULL,		"GigaDevice GD32F4xx series",		&target_gd_gd32f4xx_ops },
-  { NULL,		"Nuvoton M480 series",			&target_nu_m480_ops },
-  { NULL,		"Lattice LCMXO2 series",		&target_lattice_lcmxo2_ops },
-  { NULL,		"Raspberry Pi RP2040 (external flash)", &target_rpi_rp2040_ops },
+  { "atmel_cm0p",	"Atmel SAM C/D/L/R, PIC32CM MC",			&target_atmel_cm0p_ops },
+  { "atmel_cm3",	"Atmel SAM3X/A/U",					&target_atmel_cm3_ops },
+  { "atmel_cm4",	"Atmel SAM G and SAM4",					&target_atmel_cm4_ops },
+  { "atmel_cm7",	"Atmel SAM E7x/S7x/V7x",				&target_atmel_cm7_ops },
+  { "atmel_cm4v2",	"Atmel SAM D5x/E5x",					&target_atmel_cm4v2_ops },
+  { "mchp_cm23",	"Microchip SAM L10/L11, PIC32CM LE00/LS00/LS60",	&target_mchp_cm23_ops },
+  { NULL,		"STMicroelectronics STM32G0",				&target_st_stm32g0_ops },
+  { NULL,		"GigaDevice GD32F4xx",					&target_gd_gd32f4xx_ops },
+  { NULL,		"Nuvoton M480",						&target_nu_m480_ops },
+  { NULL,		"Lattice LCMXO2",					&target_lattice_lcmxo2_ops },
+  { NULL,		"Raspberry Pi RP2040 (external flash)", 		&target_rpi_rp2040_ops },
 };
 
 /*- Implementations ---------------------------------------------------------*/

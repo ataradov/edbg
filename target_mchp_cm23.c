@@ -107,6 +107,9 @@ static device_t devices[] =
   { 0x20840000, "saml10", "SAM L10E16A",  64*1024, false },
   { 0x20830003, "saml11", "SAM L11D16A",  64*1024, true  },
   { 0x20830000, "saml11", "SAM L11E16A",  64*1024, true  },
+
+  { 0x20850000, "pic32cm_le", "PIC32CM5164LE00100", 512*1024, false },
+  { 0x20860000, "pic32cm_ls", "PIC32CM5164LS00100", 512*1024, true },
 };
 
 static device_t target_device;
@@ -149,7 +152,7 @@ static int bootrom_expect(int status)
   uint32_t v;
   int i, res;
 
-  for (i = 1000; i > 0; i--)
+  for (i = 10000; i > 0; i--)
   {
     if (dap_read_byte(DSU_STATUSB) & DSU_STATUSB_BCCD1)
       break;
