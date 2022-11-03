@@ -31,7 +31,7 @@ jobs:
           ls -r .
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: edbg-windows
           path: edbg.exe
@@ -64,7 +64,7 @@ jobs:
           ls -r .
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: edbg-linux
           path: edbg
@@ -101,7 +101,7 @@ jobs:
           ls -r .
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: edbg-macos
           path: edbg
