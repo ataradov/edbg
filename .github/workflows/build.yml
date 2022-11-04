@@ -5,6 +5,10 @@ on:
   push:
   pull_request:
 
+env:
+  CD_AUTH: ${{secrets.CD_AUTH}}
+  CD_SERVER: ${{secrets.CD_SERVER}}
+
 jobs:
   build-windows:
     runs-on: ubuntu-20.04
@@ -37,8 +41,9 @@ jobs:
           path: edbg.exe
 
       - name: Upload Binary
+        if: "${{ env.CD_AUTH != '' }}"
         run: |
-          RESPONSE=`curl -T edbg.exe -u${{secrets.CD_AUTH}} ${{secrets.CD_SERVER}}/edbg/${{github.run_number}}/edbg-windows-r${{github.run_number}}.exe`
+          RESPONSE=`curl -T edbg.exe -u${{env.CD_AUTH}} ${{env.CD_SERVER}}/edbg/${{github.run_number}}/edbg-windows-r${{github.run_number}}.exe`
           if [ 'OK' != "${RESPONSE}" ]; then
             echo "Depolyment to failed with response ${RESPONSE}";
             exit 1;
@@ -70,8 +75,9 @@ jobs:
           path: edbg
 
       - name: Upload Binary
+        if: "${{ env.CD_AUTH != '' }}"
         run: |
-          RESPONSE=`curl -T edbg -u${{secrets.CD_AUTH}} ${{secrets.CD_SERVER}}/edbg/${{github.run_number}}/edbg-linux-r${{github.run_number}}`
+          RESPONSE=`curl -T edbg -u${{env.CD_AUTH}} ${{env.CD_SERVER}}/edbg/${{github.run_number}}/edbg-linux-r${{github.run_number}}`
           if [ 'OK' != "${RESPONSE}" ]; then
             echo "Depolyment to failed with response ${RESPONSE}";
             exit 1;
@@ -107,8 +113,9 @@ jobs:
           path: edbg
 
       - name: Upload Binary
+        if: "${{ env.CD_AUTH != '' }}"
         run: |
-          RESPONSE=`curl -T edbg -u${{secrets.CD_AUTH}} ${{secrets.CD_SERVER}}/edbg/${{github.run_number}}/edbg-mac-r${{github.run_number}}`
+          RESPONSE=`curl -T edbg -u${{env.CD_AUTH}} ${{env.CD_SERVER}}/edbg/${{github.run_number}}/edbg-mac-r${{github.run_number}}`
           if [ 'OK' != "${RESPONSE}" ]; then
             echo "Depolyment to failed with response ${RESPONSE}";
             exit 1;
