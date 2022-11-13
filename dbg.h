@@ -15,8 +15,8 @@
 typedef struct
 {
   char     *path;
+  uint64_t entry_id;
   char     *serial;
-  wchar_t  *wserial;
   char     *manufacturer;
   char     *product;
   int      vid;

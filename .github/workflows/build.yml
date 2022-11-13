@@ -89,15 +89,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v1
 
-      - name: Install Requirements
-        run: |
-          brew install hidapi;
-
-      - name: Check requirements
-        run: |
-          brew list --versions hidapi
-          brew info hidapi
-
       - name: Compile
         run: |
           make all

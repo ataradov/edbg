@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Copyright (c) 2015, Lourens Rozema <me@LourensRozema.nl>. All rights reserved.
+// Copyright (c) 2022, Alex Taradov <alex@taradov.com>. All rights reserved.
 
 /*- Includes ----------------------------------------------------------------*/
 #include <string.h>
@@ -8,77 +8,187 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <wchar.h>
-#include "hidapi.h"
+#include <IOKit/IOKitLib.h>
+#include <IOKit/hid/IOHIDLib.h>
+#include <IOKit/hid/IOHIDDevice.h>
 #include "edbg.h"
 #include "dbg.h"
 
+/*- Definitions -------------------------------------------------------------*/
+#define MAX_DEVICES    256 // Not possible with USB, just a big safe number
+
 /*- Variables ---------------------------------------------------------------*/
-static hid_device *handle = NULL;
-static uint8_t hid_buffer[DBG_MAX_EP_SIZE + 1];
-static int report_size = 512; // TODO: read actual report size
+static IOHIDDeviceRef debugger_handle = NULL;
+static uint8_t tx_buffer[DBG_MAX_EP_SIZE];
+static uint8_t rx_buffer[DBG_MAX_EP_SIZE];
+static int rx_size = -1;
+static int report_size;
 
 /*- Implementations ---------------------------------------------------------*/
 
 //-----------------------------------------------------------------------------
-char *wcstombsdup(const wchar_t * const src)
+static int32_t get_int_property(IOHIDDeviceRef device, CFStringRef prop)
 {
-  const int len = wcslen(src);
-  char * const dst = malloc(len + 1);
+  CFTypeRef ref;
+  int32_t value;
 
-  if (dst)
-  {
-    wcstombs(dst, src, len);
-    dst[len] = '\0';
-  }
+  ref = IOHIDDeviceGetProperty(device, prop);
 
-  return dst;
+  if (!ref)
+    return 0;
+
+  if (CFGetTypeID(ref) != CFNumberGetTypeID())
+     error_exit("failed to get integer property value");
+
+  CFNumberGetValue((CFNumberRef) ref, kCFNumberSInt32Type, &value);
+
+  return value;
+}
+
+//-----------------------------------------------------------------------------
+static char * get_string_property(IOHIDDeviceRef device, CFStringRef prop)
+{
+  CFStringRef str;
+  CFIndex len, max_size;
+  char *res;
+
+  str = (CFStringRef)IOHIDDeviceGetProperty(device, prop);
+
+  if (!str)
+    return "<unknown>";
+
+  len = CFStringGetLength(str);
+  max_size = CFStringGetMaximumSizeForEncoding(len, kCFStringEncodingUTF8) + 1;
+
+  res = (char *)malloc(max_size);
+
+  if (!res)
+    error_exit("out of memory");
+
+  if (!CFStringGetCString(str, res, max_size, kCFStringEncodingUTF8))
+    error_exit("failed to get string property value");
+
+  return res;
 }
 
 //-----------------------------------------------------------------------------
 int dbg_enumerate(debugger_t *debuggers, int size)
 {
-  struct hid_device_info *devs, *cur_dev;
+  IOHIDManagerRef hid_manager;
+  CFSetRef device_set;
+  IOHIDDeviceRef device_list[MAX_DEVICES];
+  int device_count;
   int rsize = 0;
 
-  if (hid_init())
+  hid_manager = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
+
+  if (NULL == hid_manager || CFGetTypeID(hid_manager) != IOHIDManagerGetTypeID())
+    error_exit("unable to access HID manager");
+
+  IOHIDManagerSetDeviceMatching(hid_manager, NULL);
+
+  device_set = IOHIDManagerCopyDevices(hid_manager);
+
+  if (NULL == device_set)
     return 0;
 
-  devs = hid_enumerate(0, 0);
-  cur_dev = devs;
+  device_count = CFSetGetCount(device_set);
 
-  for (cur_dev = devs; cur_dev && rsize < size; cur_dev = cur_dev->next)
+  if (device_count > MAX_DEVICES)
+    error_exit("too many devices");
+
+  CFSetGetValues(device_set, (const void **)&device_list);
+
+  for (int i = 0; i < device_count; i++)
   {
-    debuggers[rsize].path = strdup(cur_dev->path);
-    debuggers[rsize].serial = cur_dev->serial_number ? wcstombsdup(cur_dev->serial_number) : "<unknown>";
-    debuggers[rsize].wserial = cur_dev->serial_number ? wcsdup(cur_dev->serial_number) : NULL;
-    debuggers[rsize].manufacturer = cur_dev->manufacturer_string ? wcstombsdup(cur_dev->manufacturer_string) : "<unknown>";
-    debuggers[rsize].product = cur_dev->product_string ? wcstombsdup(cur_dev->product_string) : "<unknown>";
-    debuggers[rsize].vid = cur_dev->vendor_id;
-    debuggers[rsize].pid = cur_dev->product_id;
+    IOHIDDeviceRef dev = device_list[i];
+
+    if (!dev)
+      continue;
+
+    io_object_t iokit_dev = IOHIDDeviceGetService(dev);
+    kern_return_t res;
+
+    if (iokit_dev == MACH_PORT_NULL)
+      error_exit("iokit_dev == MACH_PORT_NULL");
+
+    res = IORegistryEntryGetRegistryEntryID(iokit_dev, &debuggers[rsize].entry_id);
+
+    if (res != KERN_SUCCESS)
+      error_exit("failed to get entry_id");
+
+    debuggers[rsize].path         = NULL;
+    debuggers[rsize].serial       = get_string_property(dev, CFSTR(kIOHIDSerialNumberKey));
+    debuggers[rsize].manufacturer = get_string_property(dev, CFSTR(kIOHIDManufacturerKey));
+    debuggers[rsize].product      = get_string_property(dev, CFSTR(kIOHIDProductKey));
+    debuggers[rsize].vid          = get_int_property(dev, CFSTR(kIOHIDVendorIDKey));
+    debuggers[rsize].pid          = get_int_property(dev, CFSTR(kIOHIDProductIDKey));
 
     if (strstr(debuggers[rsize].product, "CMSIS-DAP"))
       rsize++;
+
+    if (rsize == size)
+      break;
   }
 
-  hid_free_enumeration(devs);
+  CFRelease(device_set);
 
   return rsize;
 }
 
 //-----------------------------------------------------------------------------
+static void rx_callback(void *user, IOReturn result, void *sender, IOHIDReportType type,
+    uint32_t report_id, uint8_t *report, CFIndex report_length)
+{
+  rx_size = report_length;
+
+  (void)user;
+  (void)result;
+  (void)sender;
+  (void)type;
+  (void)report_id;
+  (void)report;
+}
+
+//-----------------------------------------------------------------------------
 void dbg_open(debugger_t *debugger)
 {
-  handle = hid_open(debugger->vid, debugger->pid, debugger->wserial);
+  io_registry_entry_t entry = MACH_PORT_NULL;
+  IOReturn ret = kIOReturnInvalid;
 
-  if (!handle)
-    perror_exit("unable to open device");
+  entry = IOServiceGetMatchingService((mach_port_t)0, IORegistryEntryIDMatching(debugger->entry_id));
+
+  if (MACH_PORT_NULL == entry)
+    error_exit("IOServiceGetMatchingService() failed");
+
+  debugger_handle = IOHIDDeviceCreate(kCFAllocatorDefault, entry);
+
+  if (NULL == debugger_handle)
+    error_exit("IOHIDDeviceCreate() failed");
+
+  ret = IOHIDDeviceOpen(debugger_handle, kIOHIDOptionsTypeNone);
+
+  if (kIOReturnSuccess != ret)
+    error_exit("IOHIDDeviceOpen() failed");
+
+  report_size = get_int_property(debugger_handle, CFSTR(kIOHIDMaxInputReportSizeKey));
+
+  IOHIDDeviceRegisterInputReportCallback(debugger_handle, rx_buffer, report_size, &rx_callback, NULL);
+
+  IOHIDDeviceScheduleWithRunLoop(debugger_handle, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
+
+  IOObjectRelease(entry);
 }
 
 //-----------------------------------------------------------------------------
 void dbg_close(void)
 {
-  if (handle)
-    hid_close(handle);
+  if (debugger_handle)
+  {
+    IOHIDDeviceRegisterRemovalCallback(debugger_handle, NULL, NULL);
+    IOHIDDeviceClose(debugger_handle, kIOHIDOptionsTypeNone);
+    debugger_handle = NULL;
+  }
 }
 
 //-----------------------------------------------------------------------------
@@ -91,32 +201,44 @@ int dbg_get_report_size(void)
 int dbg_dap_cmd(uint8_t *data, int resp_size, int req_size)
 {
   uint8_t cmd = data[0];
-  int res;
+  IOReturn ret;
 
-  memset(hid_buffer, 0xff, report_size + 1);
+  if (NULL == debugger_handle)
+    return 0;
 
-  hid_buffer[0] = 0x00; // Report ID
-  memcpy(&hid_buffer[1], data, req_size);
+  rx_size = -1;
 
-  res = hid_write(handle, hid_buffer, report_size + 1);
-  if (res < 0)
+  memset(tx_buffer, 0xff, report_size);
+  memcpy(tx_buffer, data, req_size);
+
+  ret = IOHIDDeviceSetReport(debugger_handle, kIOHIDReportTypeOutput, 0, tx_buffer, report_size);
+
+  if (ret != kIOReturnSuccess)
+    error_exit("HID write failed");
+
+  while (1)
   {
-    message("Error: %ls\n", hid_error(handle));
-    perror_exit("debugger write()");
+    int res = CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.001, true);
+
+    if (kCFRunLoopRunFinished == res)
+      error_exit("debugger disconnected");
+
+    if (kCFRunLoopRunTimedOut != res && kCFRunLoopRunHandledSource != res)
+      error_exit("debugger rx error");
+
+    if (rx_size >= 0)
+      break;
   }
 
-  res = hid_read(handle, hid_buffer, report_size + 1);
-  if (res < 0)
-    perror_exit("debugger read()");
+  check(rx_size, "empty response received");
 
-  check(res, "empty response received");
+  if (rx_buffer[0] != cmd)
+    error_exit("invalid response received: request = 0x%02x, response = 0x%02x", cmd, rx_buffer[0]);
 
-  if (hid_buffer[0] != cmd)
-    error_exit("invalid response received: request = 0x%02x, response = 0x%02x", cmd, hid_buffer[0]);
+  rx_size--;
 
-  res--;
-  memcpy(data, &hid_buffer[1], (resp_size < res) ? resp_size : res);
+  memcpy(data, &rx_buffer[1], (resp_size < rx_size) ? resp_size : rx_size);
 
-  return res;
+  return rx_size;
 }
 
