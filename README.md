@@ -22,7 +22,7 @@ you will need:
 
  * Windows: none
  * Linux: libudev-dev
- * Mac OS X: libhidapi (can be installed via [brew](http://macappstore.org/hidapi/))
+ * Mac OS X: none
 
 ## Usage
 ```
