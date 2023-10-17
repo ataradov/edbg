@@ -109,7 +109,22 @@ static device_t devices[] =
   { 0x20830000, "saml11", "SAM L11E16A",  64*1024, true  },
 
   { 0x20850000, "pic32cm_le", "PIC32CM5164LE00100", 512*1024, false },
+  { 0x20850001, "pic32cm_le", "PIC32CM5164LE00064", 512*1024, false },
+  { 0x20850002, "pic32cm_le", "PIC32CM5164LE00048", 512*1024, false },
+  { 0x20850004, "pic32cm_le", "PIC32CM2532LE00100", 256*1024, false },
+  { 0x20850005, "pic32cm_le", "PIC32CM2532LE00064", 256*1024, false },
+  { 0x20850006, "pic32cm_le", "PIC32CM2532LE00048", 256*1024, false },
+
   { 0x20860000, "pic32cm_ls", "PIC32CM5164LS00100", 512*1024, true },
+  { 0x20860001, "pic32cm_ls", "PIC32CM5164LS00064", 512*1024, true },
+  { 0x20860002, "pic32cm_ls", "PIC32CM5164LS00048", 512*1024, true },
+  { 0x20860004, "pic32cm_ls", "PIC32CM2532LS00100", 256*1024, true },
+  { 0x20860005, "pic32cm_ls", "PIC32CM2532LS00064", 256*1024, true },
+  { 0x20860006, "pic32cm_ls", "PIC32CM2532LS00048", 256*1024, true },
+
+  { 0x20870000, "pic32cm_ls", "PIC32CM5164LS60100", 512*1024, true },
+  { 0x20870001, "pic32cm_ls", "PIC32CM5164LS60064", 512*1024, true },
+  { 0x20870002, "pic32cm_ls", "PIC32CM5164LS60048", 512*1024, true },
 };
 
 static device_t target_device;
