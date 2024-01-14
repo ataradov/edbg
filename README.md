@@ -30,6 +30,7 @@ Usage: edbg [options]
 Options:
   -h, --help                 print this help message and exit
   -b, --verbose              print verbose messages
+  -d, --version <version>    use a specified CMSIS-DAP version (default is best available)
   -x, --reset <duration>     assert the reset pin before any other operation (duration in ms)
   -e, --erase                perform a chip erase before programming
   -p, --program              program the chip
