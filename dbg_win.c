@@ -95,6 +95,8 @@ int dbg_enumerate(debugger_t *debuggers, int size)
       debuggers[rsize].vid = hid_attr.VendorID;
       debuggers[rsize].pid = hid_attr.ProductID;
 
+      debuggers[rsize].versions = DBG_CMSIS_DAP_V1;
+
       if (strstr(debuggers[rsize].product, "CMSIS-DAP"))
         rsize++;
 
@@ -110,7 +112,7 @@ int dbg_enumerate(debugger_t *debuggers, int size)
 }
 
 //-----------------------------------------------------------------------------
-void dbg_open(debugger_t *debugger)
+void dbg_open(debugger_t *debugger, int version)
 {
   HIDP_CAPS caps;
   PHIDP_PREPARSED_DATA prep;
@@ -135,6 +137,8 @@ void dbg_open(debugger_t *debugger)
     error_exit("detected report size (%d) is not 64, 512 or 1024", input);
 
   report_size = input;
+
+  (void)version;
 }
 
 //-----------------------------------------------------------------------------
@@ -145,7 +149,7 @@ void dbg_close(void)
 }
 
 //-----------------------------------------------------------------------------
-int dbg_get_report_size(void)
+int dbg_get_packet_size(void)
 {
   return report_size;
 }

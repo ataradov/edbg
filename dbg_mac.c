@@ -123,6 +123,7 @@ int dbg_enumerate(debugger_t *debuggers, int size)
     debuggers[rsize].product      = get_string_property(dev, CFSTR(kIOHIDProductKey));
     debuggers[rsize].vid          = get_int_property(dev, CFSTR(kIOHIDVendorIDKey));
     debuggers[rsize].pid          = get_int_property(dev, CFSTR(kIOHIDProductIDKey));
+    debuggers[rsize].versions     = DBG_CMSIS_DAP_V1;
 
     if (strstr(debuggers[rsize].product, "CMSIS-DAP"))
       rsize++;
@@ -151,7 +152,7 @@ static void rx_callback(void *user, IOReturn result, void *sender, IOHIDReportTy
 }
 
 //-----------------------------------------------------------------------------
-void dbg_open(debugger_t *debugger)
+void dbg_open(debugger_t *debugger, int version)
 {
   io_registry_entry_t entry = MACH_PORT_NULL;
   IOReturn ret = kIOReturnInvalid;
@@ -178,6 +179,8 @@ void dbg_open(debugger_t *debugger)
   IOHIDDeviceScheduleWithRunLoop(debugger_handle, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
 
   IOObjectRelease(entry);
+
+  (void)version;
 }
 
 //-----------------------------------------------------------------------------
@@ -192,7 +195,7 @@ void dbg_close(void)
 }
 
 //-----------------------------------------------------------------------------
-int dbg_get_report_size(void)
+int dbg_get_packet_size(void)
 {
   return report_size;
 }

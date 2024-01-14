@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Copyright (c) 2013-2022, Alex Taradov <alex@taradov.com>. All rights reserved.
+// Copyright (c) 2013-2024, Alex Taradov <alex@taradov.com>. All rights reserved.
 
 /*- Includes ----------------------------------------------------------------*/
 #include <stdio.h>
@@ -682,7 +682,7 @@ static void append_word(uint32_t value)
 //-----------------------------------------------------------------------------
 static bool buffer_request(dap_request_t *req)
 {
-  int packet_size = dbg_get_report_size();
+  int packet_size = dbg_get_packet_size();
   int buf_size, ops_size, response_size, address_inc;
   uint32_t address, csw;
   bool set_address;
@@ -1046,7 +1046,7 @@ void dap_jtag_flush(void)
   tdo_count = 0;
   req_count = 0;
   req_size  = 2; // Command and Count
-  remaining = dbg_get_report_size() - req_size - 1;
+  remaining = dbg_get_packet_size() - req_size - 1;
 
   while (index < dap_jtag_request_count)
   {
@@ -1107,7 +1107,7 @@ void dap_jtag_flush(void)
       tdo_count = 0;
       req_count = 0;
       req_size  = 2; // Command and Count
-      remaining = dbg_get_report_size() - req_size - 1;
+      remaining = dbg_get_packet_size() - req_size - 1;
     }
   }
 
