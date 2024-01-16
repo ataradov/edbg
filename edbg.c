@@ -474,7 +474,7 @@ static void parse_command_line(int argc, char **argv)
 //-----------------------------------------------------------------------------
 int main(int argc, char **argv)
 {
-  debugger_t debuggers[MAX_DEBUGGERS];
+  debugger_t debuggers[MAX_DEBUGGERS] = {0};
   int n_debuggers = 0;
   int debugger = -1;
   target_ops_t *target_ops;
@@ -498,8 +498,20 @@ int main(int argc, char **argv)
   if (g_list)
   {
     message("Attached debuggers:\n");
+
     for (int i = 0; i < n_debuggers; i++)
-      message("  %d: %s - %s %s\n", i, debuggers[i].serial, debuggers[i].manufacturer, debuggers[i].product);
+    {
+      char ver[8] = "";
+
+      if (debuggers[i].versions & DBG_CMSIS_DAP_V1)
+        strcat(ver, "1");
+
+      if (debuggers[i].versions & DBG_CMSIS_DAP_V2)
+        strcat(ver, "2");
+
+      message("  %d: %s - %s %s (%s)\n", i, debuggers[i].serial, debuggers[i].manufacturer, debuggers[i].product, ver);
+    }
+
     return 0;
   }
 

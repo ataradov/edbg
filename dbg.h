@@ -29,11 +29,13 @@ typedef struct
   int      versions;
   bool     use_v2;
 
+  char     *v1_path;
   int      v1_interface;
   int      v1_ep_size;
   int      v1_tx_ep;
   int      v1_rx_ep;
 
+  char     *v2_path;
   int      v2_interface;
   int      v2_ep_size;
   int      v2_tx_ep;

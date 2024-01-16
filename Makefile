@@ -40,7 +40,7 @@ else
   else
     BIN = edbg.exe
     SRCS += dbg_win.c
-    LIBS += -lhid -lsetupapi
+    LIBS += -lhid -lwinusb -lsetupapi
   endif
 endif
 

@@ -131,6 +131,9 @@ static void parse_descriptors(debugger_t *debugger, int fd, uint8_t *desc, int s
 
     if (USB_CLASS_HID == interface->bInterfaceClass)
     {
+      if (!usb_endpoint_xfer_int(ep0) || !usb_endpoint_xfer_int(ep1))
+        continue;
+
       if (usb_endpoint_dir_in(ep0))
       {
         debugger->v1_tx_ep = ep1->bEndpointAddress;
@@ -150,6 +153,9 @@ static void parse_descriptors(debugger_t *debugger, int fd, uint8_t *desc, int s
 
     if (USB_CLASS_VENDOR_SPEC == interface->bInterfaceClass)
     {
+      if (!usb_endpoint_xfer_bulk(ep0) || !usb_endpoint_xfer_bulk(ep1))
+        continue;
+
       if (usb_endpoint_dir_in(ep0))
         continue;
 
