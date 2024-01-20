@@ -43,7 +43,10 @@ static char *get_string(int fd, int index)
   ctrl.timeout      = CONTROL_TIMEOUT;
 
   int res = ioctl(fd, USBDEVFS_CONTROL, &ctrl);
-  check(res >= 0, "ioctl(CONTROL): %d", res);
+
+  if (res < 0)
+    return "";
+
   check(res >= 2 && 0 == (res % 2), "invalid string descriptor response");
 
   int len = res/2 - 1;
