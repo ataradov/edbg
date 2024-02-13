@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Copyright (c) 2018-2019, Alex Taradov <alex@taradov.com>. All rights reserved.
+// Copyright (c) 2018-2024, Alex Taradov <alex@taradov.com>. All rights reserved.
 
 /*- Includes ----------------------------------------------------------------*/
 #include <unistd.h>
@@ -98,33 +98,34 @@ typedef struct
   char      *name;
   uint32_t  flash_size;
   bool      trust_zone;
+  int       crc_offset;
 } device_t;
 
 /*- Variables ---------------------------------------------------------------*/
 static device_t devices[] =
 {
-  { 0x20840003, "saml10", "SAM L10D16A",  64*1024, false },
-  { 0x20840000, "saml10", "SAM L10E16A",  64*1024, false },
-  { 0x20830003, "saml11", "SAM L11D16A",  64*1024, true  },
-  { 0x20830000, "saml11", "SAM L11E16A",  64*1024, true  },
+  { 0x20840003, "saml10", "SAM L10D16A",  64*1024, false, 28 },
+  { 0x20840000, "saml10", "SAM L10E16A",  64*1024, false, 28 },
+  { 0x20830003, "saml11", "SAM L11D16A",  64*1024, true,  28 },
+  { 0x20830000, "saml11", "SAM L11E16A",  64*1024, true,  28 },
 
-  { 0x20850000, "pic32cm_le", "PIC32CM5164LE00100", 512*1024, false },
-  { 0x20850001, "pic32cm_le", "PIC32CM5164LE00064", 512*1024, false },
-  { 0x20850002, "pic32cm_le", "PIC32CM5164LE00048", 512*1024, false },
-  { 0x20850004, "pic32cm_le", "PIC32CM2532LE00100", 256*1024, false },
-  { 0x20850005, "pic32cm_le", "PIC32CM2532LE00064", 256*1024, false },
-  { 0x20850006, "pic32cm_le", "PIC32CM2532LE00048", 256*1024, false },
+  { 0x20850000, "pic32cm_le", "PIC32CM5164LE00100", 512*1024, false, 32 },
+  { 0x20850001, "pic32cm_le", "PIC32CM5164LE00064", 512*1024, false, 32 },
+  { 0x20850002, "pic32cm_le", "PIC32CM5164LE00048", 512*1024, false, 32 },
+  { 0x20850004, "pic32cm_le", "PIC32CM2532LE00100", 256*1024, false, 32 },
+  { 0x20850005, "pic32cm_le", "PIC32CM2532LE00064", 256*1024, false, 32 },
+  { 0x20850006, "pic32cm_le", "PIC32CM2532LE00048", 256*1024, false, 32 },
 
-  { 0x20860000, "pic32cm_ls", "PIC32CM5164LS00100", 512*1024, true },
-  { 0x20860001, "pic32cm_ls", "PIC32CM5164LS00064", 512*1024, true },
-  { 0x20860002, "pic32cm_ls", "PIC32CM5164LS00048", 512*1024, true },
-  { 0x20860004, "pic32cm_ls", "PIC32CM2532LS00100", 256*1024, true },
-  { 0x20860005, "pic32cm_ls", "PIC32CM2532LS00064", 256*1024, true },
-  { 0x20860006, "pic32cm_ls", "PIC32CM2532LS00048", 256*1024, true },
+  { 0x20860000, "pic32cm_ls", "PIC32CM5164LS00100", 512*1024, true,  32 },
+  { 0x20860001, "pic32cm_ls", "PIC32CM5164LS00064", 512*1024, true,  32 },
+  { 0x20860002, "pic32cm_ls", "PIC32CM5164LS00048", 512*1024, true,  32 },
+  { 0x20860004, "pic32cm_ls", "PIC32CM2532LS00100", 256*1024, true,  32 },
+  { 0x20860005, "pic32cm_ls", "PIC32CM2532LS00064", 256*1024, true,  32 },
+  { 0x20860006, "pic32cm_ls", "PIC32CM2532LS00048", 256*1024, true,  32 },
 
-  { 0x20870000, "pic32cm_ls", "PIC32CM5164LS60100", 512*1024, true },
-  { 0x20870001, "pic32cm_ls", "PIC32CM5164LS60064", 512*1024, true },
-  { 0x20870002, "pic32cm_ls", "PIC32CM5164LS60048", 512*1024, true },
+  { 0x20870000, "pic32cm_ls", "PIC32CM5164LS60100", 512*1024, true,  32 },
+  { 0x20870001, "pic32cm_ls", "PIC32CM5164LS60064", 512*1024, true,  32 },
+  { 0x20870002, "pic32cm_ls", "PIC32CM5164LS60048", 512*1024, true,  32 },
 };
 
 static device_t target_device;
@@ -442,12 +443,12 @@ static void target_fuse_write(int section, uint8_t *data)
 
   if (0 == section)
   {
-    uint32_t crc = crc32(&data[8], 20);
+    uint32_t crc = crc32(&data[8], target_device.crc_offset-8);
 
-    data[28] = crc;
-    data[29] = crc >> 8;
-    data[30] = crc >> 16;
-    data[31] = crc >> 24;
+    data[target_device.crc_offset + 0] = crc;
+    data[target_device.crc_offset + 1] = crc >> 8;
+    data[target_device.crc_offset + 2] = crc >> 16;
+    data[target_device.crc_offset + 3] = crc >> 24;
 
     addr = USER_ROW_ADDR;
   }
@@ -519,4 +520,5 @@ target_ops_t target_mchp_cm23_ops =
   .enumerate = target_enumerate,
   .help      = target_help,
 };
+
 
