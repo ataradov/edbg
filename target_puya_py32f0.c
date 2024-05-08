@@ -86,6 +86,7 @@ typedef struct
 static device_t devices[] =
 {
   { 0x60001000, "py32f0", "PY32F002Axx5", 20*1024 },
+  { 0x20220064, "py32f0", "PY32F002Bxx5", 24*1024 },
 };
 
 static device_t target_device;
