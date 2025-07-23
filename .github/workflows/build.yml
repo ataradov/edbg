@@ -11,7 +11,7 @@ env:
 
 jobs:
   build-windows:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     env:
       COMPILER: x86_64-w64-mingw32-gcc -Iomicron/external/include/ddk
       UNAME: Windows
@@ -50,7 +50,7 @@ jobs:
           fi
 
   build-linux:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v1
