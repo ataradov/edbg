@@ -289,7 +289,7 @@ static void print_debugger_info(debugger_t *debugger)
   strcat(str, " ");
 
   size = dap_info(DAP_INFO_CAPABILITIES, buf, sizeof(buf));
-  check(size == 1, "incorrect DAP_INFO_CAPABILITIES size");
+  check(size == 1 || size == 2, "incorrect DAP_INFO_CAPABILITIES size");
 
   strcat(str, "(");
 
