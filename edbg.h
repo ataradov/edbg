@@ -11,7 +11,10 @@
 #include <stdbool.h>
 
 /*- Definitions -------------------------------------------------------------*/
-#define ARRAY_SIZE(x) ((int)(sizeof(x) / sizeof(0[x])))
+#define ARRAY_SIZE(x)  ((int)(sizeof(x) / sizeof(0[x])))
+#define BITS_IN_BYTE   8
+#define BITS_IN_HALF   16
+#define BITS_IN_WORD   32
 
 /*- Prototypes --------------------------------------------------------------*/
 void verbose(char *fmt, ...);

@@ -39,6 +39,9 @@
 #define CMD_WP                 0x5a000001
 #define CMD_EPA                0x5a000007
 #define CMD_EA                 0x5a000005
+#define CMD_SLB                0x5a000008
+#define CMD_CLB                0x5a000009
+#define CMD_GLB                0x5a00000a
 #define CMD_SGPB               0x5a00000b
 #define CMD_CGPB               0x5a00000c
 #define CMD_GGPB               0x5a00000d
@@ -46,7 +49,7 @@
 #define PAGES_IN_ERASE_BLOCK   16
 
 #define GPNVM_SIZE             1
-#define GPNVM_SIZE_BITS        8
+#define LOCK_REGION_SIZE       8192
 
 /*- Types -------------------------------------------------------------------*/
 typedef struct
@@ -55,7 +58,7 @@ typedef struct
   uint32_t  chip_exid;
   char      *family;
   char      *name;
-  uint32_t  n_planes;
+  int       n_planes;
   uint32_t  flash_size;
 } device_t;
 
@@ -149,7 +152,7 @@ static void target_select(target_options_t *options)
 
     verbose("Target: %s\n", devices[i].name);
 
-    for (uint32_t plane = 0; plane < devices[i].n_planes; plane++)
+    for (int plane = 0; plane < devices[i].n_planes; plane++)
     {
       dap_write_word(EEFC_FCR(plane), CMD_GETD);
       while (0 == (dap_read_word(EEFC_FSR(plane)) & FSR_FRDY));
@@ -196,10 +199,10 @@ static void target_deselect(void)
 //-----------------------------------------------------------------------------
 static void target_erase(void)
 {
-  for (uint32_t plane = 0; plane < target_device.n_planes; plane++)
+  for (int plane = 0; plane < target_device.n_planes; plane++)
     dap_write_word(EEFC_FCR(plane), CMD_EA);
 
-  for (uint32_t plane = 0; plane < target_device.n_planes; plane++)
+  for (int plane = 0; plane < target_device.n_planes; plane++)
     while (0 == (dap_read_word(EEFC_FSR(plane)) & FSR_FRDY));
 }
 
@@ -313,33 +316,83 @@ static void target_read(void)
 //-----------------------------------------------------------------------------
 static int target_fuse_read(int section, uint8_t *data)
 {
-  uint32_t gpnvm;
+  if (0 == section)
+  {
+    dap_write_word(EEFC_FCR(0), CMD_GGPB);
+    while (0 == (dap_read_word(EEFC_FSR(0)) & FSR_FRDY));
+    data[0] = dap_read_word(EEFC_FRR(0));
+    return GPNVM_SIZE;
+  }
+  else if (1 == section)
+  {
+    int size = target_device.flash_size / LOCK_REGION_SIZE;
 
-  if (section > 0)
-    return 0;
+    for (int plane = 0; plane < target_device.n_planes; plane++)
+    {
+      uint32_t value = 0;
 
-  dap_write_word(EEFC_FCR(0), CMD_GGPB);
-  while (0 == (dap_read_word(EEFC_FSR(0)) & FSR_FRDY));
-  gpnvm = dap_read_word(EEFC_FRR(0));
+      dap_write_word(EEFC_FCR(plane), CMD_GLB);
+      while (0 == (dap_read_word(EEFC_FSR(plane)) & FSR_FRDY));
 
-  data[0] = gpnvm;
+      for (int i = 0; i < size; i++)
+      {
+        int index = plane * size + i;
 
-  return GPNVM_SIZE;
+        if (0 == (index % BITS_IN_WORD))
+          value = dap_read_word(EEFC_FRR(plane));
+
+        if (0 == (index % BITS_IN_BYTE))
+          data[index / BITS_IN_BYTE] = 0;
+
+        if (value & (1 << (index % BITS_IN_WORD)))
+          data[index / BITS_IN_BYTE] |= (1 << (index % BITS_IN_BYTE));
+      }
+    }
+
+    return (size * target_device.n_planes) / BITS_IN_BYTE;
+  }
+
+  return 0;
 }
 
 //-----------------------------------------------------------------------------
 static void target_fuse_write(int section, uint8_t *data)
 {
-  uint32_t gpnvm = data[0];
-
-  check(0 == section, "internal: incorrect section index in target_fuse_write()");
-
-  for (int i = 0; i < GPNVM_SIZE_BITS; i++)
+  if (0 == section)
   {
-    if (gpnvm & (1 << i))
-      dap_write_word(EEFC_FCR(0), CMD_SGPB | (i << 8));
-    else
-      dap_write_word(EEFC_FCR(0), CMD_CGPB | (i << 8));
+    for (int i = 0; i < (GPNVM_SIZE * BITS_IN_BYTE); i++)
+    {
+      if (data[0] & (1ul << i))
+        dap_write_word(EEFC_FCR(0), CMD_SGPB | (i << 8));
+      else
+        dap_write_word(EEFC_FCR(0), CMD_CGPB | (i << 8));
+
+      while (0 == (dap_read_word(EEFC_FSR(0)) & FSR_FRDY));
+    }
+  }
+  else if (1 == section)
+  {
+    int size = target_device.flash_size / LOCK_REGION_SIZE;
+
+    for (int plane = 0; plane < target_device.n_planes; plane++)
+    {
+      for (int i = 0; i < size; i++)
+      {
+        int page = i * LOCK_REGION_SIZE / FLASH_PAGE_SIZE;
+        int index = plane * size + i;
+
+        if (data[index / BITS_IN_BYTE] & (1 << (index % BITS_IN_BYTE)))
+          dap_write_word(EEFC_FCR(plane), CMD_SLB | (page << 8));
+        else
+          dap_write_word(EEFC_FCR(plane), CMD_CLB | (page << 8));
+
+        while (0 == (dap_read_word(EEFC_FSR(plane)) & FSR_FRDY));
+      }
+    }
+  }
+  else
+  {
+    error_exit("internal: incorrect section index in target_fuse_write()");
   }
 }
 
@@ -355,7 +408,8 @@ static char *target_enumerate(int i)
 //-----------------------------------------------------------------------------
 static char target_help[] =
   "Fuses:\n"
-  "  This device has one fuses section, which represents GPNVM bits.\n";
+  "  0 - GPNVM (8 bits)\n"
+  "  1 - Lock Bits (one bit per 8 KB region)\n";
 
 //-----------------------------------------------------------------------------
 target_ops_t target_atmel_cm4_ops =
@@ -373,4 +427,5 @@ target_ops_t target_atmel_cm4_ops =
   .enumerate = target_enumerate,
   .help      = target_help,
 };
+
 
